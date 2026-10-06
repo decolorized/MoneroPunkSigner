@@ -38,13 +38,13 @@ OfflineTxSigningWizard::OfflineTxSigningWizard(QWidget *parent, Wallet *wallet, 
     setPage(Page_ImportUnsignedTx, new PageOTS_ImportUnsignedTx(this, m_wallet, &m_wizardFields));
     setPage(Page_SignTx, new PageOTS_SignTx(this));
     setPage(Page_ExportSignedTx, new PageOTS_ExportSignedTx(this, m_wallet, &m_wizardFields));
-    
+
     if (tx) {
         setStartId(Page_ExportUnsignedTx);
     } else {
         setStartId(m_wallet->viewOnly() ? Page_ExportOutputs : Page_ImportOffline);
     }
-    
+
     this->setWindowTitle("Offline transaction signing");
 
     QList<QWizard::WizardButton> layout;
@@ -59,7 +59,7 @@ OfflineTxSigningWizard::OfflineTxSigningWizard(QWidget *parent, Wallet *wallet, 
     // setOption(QWizard::HaveCustomButton1, true);
     setOption(QWizard::NoBackButtonOnStartPage);
     setWizardStyle(WizardStyle::ModernStyle);
-    
+
     bool geo = this->restoreGeometry(QByteArray::fromBase64(conf()->get(Config::geometryOTSWizard).toByteArray()));
     if (!geo) {
         QScreen *currentScreen = QApplication::screenAt(this->geometry().center());
@@ -67,7 +67,7 @@ OfflineTxSigningWizard::OfflineTxSigningWizard(QWidget *parent, Wallet *wallet, 
             currentScreen = QApplication::primaryScreen();
         }
         int availableHeight = currentScreen->availableGeometry().height() - 100;
-        
+
         this->resize(availableHeight, availableHeight);
     }
 

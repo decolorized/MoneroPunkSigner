@@ -1,9 +1,6 @@
 set(CMAKE_AUTOMOC ON)
 set(CMAKE_AUTOUIC ON)
 set(CMAKE_AUTORCC ON)
-IF(STATIC AND APPLE)
-    set(CMAKE_AUTOMOC_COMPILER_PREDEFINES OFF)
-ENDIF()
 
 set(QT_COMPONENTS
         Core
@@ -23,13 +20,15 @@ endif()
 
 IF (UNIX AND NOT APPLE)
     list(APPEND QT_COMPONENTS WaylandClient)
-endif()
+ENDIF()
 
 find_package(Qt6 REQUIRED COMPONENTS ${QT_COMPONENTS})
 
 if (CHECK_UPDATES)
     add_subdirectory(openpgp)
 endif()
+
+add_subdirectory(hid)
 
 qt_add_resources(RESOURCES assets.qrc assets_tor.qrc assets_docs.qrc)
 
@@ -126,6 +125,24 @@ list(APPEND SOURCE_FILES
         ${QRCODE_UTILS_FILES}
         ${SCANNER_FILES})
 
+# ---------------------------------------------------------------------------
+# HID support (mwlink protocol)
+# ---------------------------------------------------------------------------
+# Файлы src/hid/*.{h,cpp} собираются отдельной библиотекой feather_hid,
+# которая подключается как зависимость (см. ниже). В SOURCE_FILES
+# их добавлять НЕ нужно — они не часть target feather напрямую.
+#
+# Здесь только проверяем, определена ли цель feather_hid (создаётся
+# в src/hid/CMakeLists.txt через add_subdirectory в корневом CMakeLists).
+
+set(FEATHER_HAVE_HID OFF)
+if (TARGET feather_hid)
+    set(FEATHER_HAVE_HID ON)
+    message(STATUS "Feather: HID support enabled (feather_hid target found)")
+else()
+    message(STATUS "Feather: HID support disabled (no feather_hid target)")
+endif()
+
 set(EXECUTABLE_FLAG)
 if(MINGW)
     set(EXECUTABLE_FLAG WIN32)
@@ -185,6 +202,19 @@ target_include_directories(feather PUBLIC
         ${BCUR_INCLUDE_DIR}
 )
 
+# ---------------------------------------------------------------------------
+# HID include directories
+# ---------------------------------------------------------------------------
+# Feather включает MwLink.h и MwWallet.h из src/hid/.
+# Публичный include feather_hid уже добавляет ${CMAKE_CURRENT_SOURCE_DIR}/hid,
+# но для читаемости продублируем здесь (или можно убрать — Public-инклюд
+# работает через target_link_libraries).
+if (FEATHER_HAVE_HID)
+    target_include_directories(feather PRIVATE
+            ${CMAKE_CURRENT_SOURCE_DIR}/hid
+    )
+endif()
+
 target_compile_definitions(feather PRIVATE FEATHER_VERSION="${PROJECT_VERSION}")
 target_compile_definitions(feather PRIVATE FEATHER_TARGET_TRIPLET="${FEATHER_TARGET_TRIPLET}")
 target_compile_definitions(feather PRIVATE TOR_VERSION="${TOR_VERSION}")
@@ -201,6 +231,10 @@ if(SELF_CONTAINED)
     target_compile_definitions(feather PRIVATE SELF_CONTAINED=1)
 endif()
 
+if(DONATE_BEG)
+    target_compile_definitions(feather PRIVATE DONATE_BEG=1)
+endif()
+
 if (CHECK_UPDATES)
     target_compile_definitions(feather PRIVATE CHECK_UPDATES=1)
 endif()
@@ -211,6 +245,19 @@ endif()
 
 if(WITH_SCANNER)
     target_compile_definitions(feather PRIVATE WITH_SCANNER=1)
+endif()
+
+# ---------------------------------------------------------------------------
+# HID compile definition
+# ---------------------------------------------------------------------------
+# FEATHER_HAVE_HID=1 — код Feather может использовать
+#   #ifdef FEATHER_HAVE_HID
+#       // HID-ветка визарда
+#   #endif
+# Если макрос не определён, HID-ветка не компилируется, комбобокс
+# «HID device» можно не показывать (или показывать с сообщением).
+if (FEATHER_HAVE_HID)
+    target_compile_definitions(feather PRIVATE FEATHER_HAVE_HID=1)
 endif()
 
 # TODO: PLACEHOLDER
@@ -287,6 +334,16 @@ target_link_libraries(feather PRIVATE
         ${ZLIB_LIBRARIES}
         ${BCUR_LIBRARY}
 )
+
+# ---------------------------------------------------------------------------
+# HID library
+# ---------------------------------------------------------------------------
+# feather_hid — статическая библиотека из src/hid/CMakeLists.txt.
+# Подключается условно: если hidapi/zlib не найдены, цели нет.
+if (FEATHER_HAVE_HID)
+    target_link_libraries(feather PRIVATE feather_hid)
+    message(STATUS "Feather: linked against feather_hid")
+endif()
 
 if(CHECK_UPDATES)
     target_link_libraries(feather PRIVATE openpgp)

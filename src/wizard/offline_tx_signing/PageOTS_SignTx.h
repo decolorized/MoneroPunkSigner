@@ -19,5 +19,4 @@ public:
     [[nodiscard]] int nextId() const override;
 };
 
-
-#endif //FEATHER_PAGEOTS_SIGNTX_H
+#endif // FEATHER_PAGEOTS_SIGNTX_H

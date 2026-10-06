@@ -16,12 +16,12 @@ namespace Ui {
 
 class PageOTS_ImportOffline : public PageOTS_Import
 {
-Q_OBJECT
+    Q_OBJECT
 
-enum ImportType {
-    OUTPUTS = 0,
-    UNSIGNED_TX
-};
+    enum ImportType {
+        OUTPUTS = 0,
+        UNSIGNED_TX
+    };
 
 public:
     explicit PageOTS_ImportOffline(QWidget *parent, Wallet *wallet, TxWizardFields *wizardFields);
@@ -37,4 +37,4 @@ private:
     ImportType m_importType = UNSIGNED_TX;
 };
 
-#endif //FEATHER_PAGEOTS_IMPORT_H
+#endif // FEATHER_PAGEOTS_IMPORTOFFLINE_H

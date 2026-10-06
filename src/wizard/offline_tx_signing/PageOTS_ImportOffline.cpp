@@ -42,7 +42,7 @@ void PageOTS_ImportOffline::importFromStr(const std::string &data) {
     else if (this->isUnsignedTransaction(data)) {
         UnsignedTransaction *utx = m_wallet->loadUnsignedTransactionFromStr(data);
 
-        if (utx->status() != UnsignedTransaction::Status_Ok) {
+        if (!utx || utx->status() != UnsignedTransaction::Status_Ok) {
             m_scanWidget->pause();
             message.title = "Failed to import unsigned transaction";
             QString error = m_wallet->errorString();
@@ -55,20 +55,6 @@ void PageOTS_ImportOffline::importFromStr(const std::string &data) {
             return;
         }
 
-        if (utx->txCount() == 0) {
-            m_scanWidget->pause();
-            Utils::showError(this, "Unable to load unsigned transaction", "Unsigned transaction set contains no transactions");
-            m_scanWidget->reset();
-            return;
-        }
-
-        if (utx->txCount() > 1) {
-            m_scanWidget->pause();
-            Utils::showError(this, "Unable to load unsigned transaction", "Unsigned transaction set contains more than one transaction");
-            m_scanWidget->reset();
-            return;
-        }
-
         ui->frame_status->show();
         ui->frame_status->setInfo(icons()->icon("confirmed.svg"), "Unsigned transaction imported successfully");
         m_wizardFields->utx = utx;
@@ -76,6 +62,7 @@ void PageOTS_ImportOffline::importFromStr(const std::string &data) {
     }
     else {
         Utils::showError(this, "Failed to import outputs or unsigned transaction", "Unrecognized data");
+        m_scanWidget->reset();
         return;
     }
 

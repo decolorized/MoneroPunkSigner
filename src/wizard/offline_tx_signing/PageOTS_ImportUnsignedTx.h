@@ -15,7 +15,7 @@ namespace Ui {
 
 class PageOTS_ImportUnsignedTx : public PageOTS_Import
 {
-Q_OBJECT
+    Q_OBJECT
 
 public:
     explicit PageOTS_ImportUnsignedTx(QWidget *parent, Wallet *wallet, TxWizardFields *wizardFields);
@@ -25,4 +25,4 @@ private slots:
     void importFromStr(const std::string &data) override;
 };
 
-#endif //FEATHER_PAGEOTS_IMPORTUNSIGNEDTX_H
+#endif // FEATHER_PAGEOTS_IMPORTUNSIGNEDTX_H

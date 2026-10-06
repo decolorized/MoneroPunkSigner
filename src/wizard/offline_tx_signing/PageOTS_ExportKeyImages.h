@@ -14,7 +14,7 @@ namespace Ui {
 
 class PageOTS_ExportKeyImages : public QWizardPage
 {
-Q_OBJECT
+    Q_OBJECT
 
 public:
     explicit PageOTS_ExportKeyImages(QWidget *parent, Wallet *wallet, TxWizardFields *wizardFields);
@@ -26,10 +26,10 @@ private slots:
 
 private:
     void setupUR(bool all);
-    
+
     Ui::PageOTS_Export *ui;
     Wallet *m_wallet;
     TxWizardFields *m_wizardFields;
 };
 
-#endif //FEATHER_PAGEOTS_EXPORTKEYIMAGES_H
+#endif // FEATHER_PAGEOTS_EXPORTKEYIMAGES_H

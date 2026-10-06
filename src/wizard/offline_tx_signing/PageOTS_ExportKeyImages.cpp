@@ -6,6 +6,7 @@
 #include "OfflineTxSigningWizard.h"
 
 #include <QCheckBox>
+#include <QSignalBlocker>
 
 #include "utils/config.h"
 #include "utils/Utils.h"
@@ -18,14 +19,24 @@ PageOTS_ExportKeyImages::PageOTS_ExportKeyImages(QWidget *parent, Wallet *wallet
 {
     ui->setupUi(this);
     this->setTitle("2. Export key images");
-    
+
+    // HID не поддерживается на этой странице — убираем третий пункт.
+    if (ui->combo_method->count() > 2)
+        ui->combo_method->removeItem(2);
+
     ui->label_step->hide();
     ui->label_instructions->setText("Scan this animated QR code with the view-only wallet.");
 
     connect(ui->btn_export, &QPushButton::clicked, this, &PageOTS_ExportKeyImages::exportKeyImages);
-    connect(ui->combo_method, &QComboBox::currentIndexChanged, [this](int index){
+    connect(ui->combo_method, &QComboBox::currentIndexChanged, this, [this](int index){
+        // Остались только QR (0) и Files (1).
+        if (index < 0 || index > 1)
+            return;
         conf()->set(Config::offlineTxSigningMethod, index);
         ui->stackedWidget->setCurrentIndex(index);
+        // QR готовим при переключении, иначе после File → QR виджет пуст.
+        if (index == 0)
+            setupUR(false);
     });
 }
 
@@ -53,15 +64,24 @@ void PageOTS_ExportKeyImages::exportKeyImages() {
 }
 
 void PageOTS_ExportKeyImages::setupUR(bool all) {
-    // TODO: check if empty
-    std::string ki_export;
-    m_wallet->exportKeyImagesToStr(ki_export, all);
+    Q_UNUSED(all);   // key images уже в m_wizardFields->keyImages
     ui->widget_UR->setData("xmr-keyimage", m_wizardFields->keyImages);
 }
 
 void PageOTS_ExportKeyImages::initializePage() {
-    ui->combo_method->setCurrentIndex(conf()->get(Config::offlineTxSigningMethod).toInt());
-    this->setupUR(false);
+    // Если пришли из HID-режима, conf может содержать 2 — нормализуем.
+    int method = conf()->get(Config::offlineTxSigningMethod).toInt();
+    if (method > 1)
+        method = 1;
+
+    {
+        QSignalBlocker blocker(ui->combo_method);
+        ui->combo_method->setCurrentIndex(method);
+    }
+    ui->stackedWidget->setCurrentIndex(method);
+
+    if (method == 0)
+        this->setupUR(false);
 }
 
 int PageOTS_ExportKeyImages::nextId() const {

@@ -15,7 +15,7 @@ namespace Ui {
 
 class PageOTS_Import : public QWizardPage
 {
-Q_OBJECT
+    Q_OBJECT
 
 public:
     explicit PageOTS_Import(QWidget *parent, Wallet *wallet, TxWizardFields *wizardFields, int step, const QString &type, const QString &fileType, const QString &successButtonText = "Next");
@@ -23,7 +23,7 @@ public:
     bool validatePage() override;
     bool isComplete() const override;
 
-private slots:
+public slots:
     void onScanFinished(bool success);
 
 private:
@@ -32,7 +32,7 @@ private:
 
 protected:
     void onSuccess();
-    
+
     Ui::PageOTS_Import *ui;
     TxWizardFields *m_wizardFields;
     QrCodeScanWidget *m_scanWidget;
@@ -43,4 +43,4 @@ protected:
     QString m_fileType;
 };
 
-#endif //FEATHER_PAGEOTS_IMPORT_H
+#endif // FEATHER_PAGEOTS_IMPORT_H

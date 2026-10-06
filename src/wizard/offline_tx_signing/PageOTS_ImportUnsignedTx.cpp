@@ -20,23 +20,9 @@ PageOTS_ImportUnsignedTx::PageOTS_ImportUnsignedTx(QWidget *parent, Wallet *wall
 void PageOTS_ImportUnsignedTx::importFromStr(const std::string &data) {
     UnsignedTransaction *utx = m_wallet->loadUnsignedTransactionFromStr(data);
 
-    if (utx->status() != UnsignedTransaction::Status_Ok) {
+    if (!utx || utx->status() != UnsignedTransaction::Status_Ok) {
         m_scanWidget->pause();
         Utils::showError(this, "Failed to import unsigned transaction", m_wallet->errorString());
-        m_scanWidget->reset();
-        return;
-    }
-
-    if (utx->txCount() == 0) {
-        m_scanWidget->pause();
-        Utils::showError(this, "Unable to load unsigned transaction", "Unsigned transaction set contains no transactions");
-        m_scanWidget->reset();
-        return;
-    }
-
-    if (utx->txCount() > 1) {
-        m_scanWidget->pause();
-        Utils::showError(this, "Unable to load unsigned transaction", "Unsigned transaction set contains more than one transaction");
         m_scanWidget->reset();
         return;
     }

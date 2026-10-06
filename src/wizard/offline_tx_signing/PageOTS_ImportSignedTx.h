@@ -16,18 +16,20 @@ namespace Ui {
 
 class PageOTS_ImportSignedTx : public PageOTS_Import
 {
-Q_OBJECT
+    Q_OBJECT
 
 public:
     explicit PageOTS_ImportSignedTx(QWidget *parent, Wallet *wallet, TxWizardFields *wizardFields);
-//    void initializePage() override;
-    int nextId() const override;
+    [[nodiscard]] int nextId() const override;
+
+    void initializePage() override;
 
 private slots:
     void importFromStr(const std::string &data) override;
 
 private:
     bool validatePage() override;
+    bool isHidMode() const;
 };
 
-#endif //FEATHER_PAGEOTS_IMPORTSIGNEDTX_H
+#endif // FEATHER_PAGEOTS_IMPORTSIGNEDTX_H

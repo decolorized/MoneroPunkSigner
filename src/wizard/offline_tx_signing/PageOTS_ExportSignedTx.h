@@ -14,7 +14,7 @@ namespace Ui {
 
 class PageOTS_ExportSignedTx : public QWizardPage
 {
-Q_OBJECT
+    Q_OBJECT
 
 public:
     explicit PageOTS_ExportSignedTx(QWidget *parent, Wallet *wallet, TxWizardFields *wizardFields);
@@ -30,4 +30,4 @@ private:
     TxWizardFields *m_wizardFields;
 };
 
-#endif //FEATHER_PAGEOTS_EXPORTSIGNEDTX_H
+#endif // FEATHER_PAGEOTS_EXPORTSIGNEDTX_H

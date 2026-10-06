@@ -12,18 +12,23 @@
 
 struct TxWizardFields {
     UnsignedTransaction *utx = nullptr;
-    PendingTransaction *tx = nullptr;
-    std::string signedTx;
-    QrCodeScanWidget *scanWidget = nullptr;
-    bool readyToCommit = false;
-    bool readyToSign = false;
-    std::string keyImages;
+    PendingTransaction  *tx = nullptr;
+    std::string          signedTx;
+    QrCodeScanWidget    *scanWidget = nullptr;
+    bool                 readyToCommit = false;
+    bool                 readyToSign = false;
+    std::string          keyImages;
+
+    bool    viaHid        = false;
+    qint64  keyImagesSize = 0;
+    qint64  signedTxSize  = 0;
+    QString hidDeviceName;
 };
 
 class OfflineTxSigningWizard : public QWizard
 {
     Q_OBJECT
-    
+
 public:
     enum Page {
         Page_ExportOutputs = 0,
@@ -44,11 +49,13 @@ public:
     bool readyToSign();
     UnsignedTransaction* unsignedTransaction();
     PendingTransaction* signedTx();
-    
+
+    TxWizardFields& fields() { return m_wizardFields; }
+    const TxWizardFields& fields() const { return m_wizardFields; }
+
 private:
     Wallet *m_wallet;
     TxWizardFields m_wizardFields;
 };
 
-
-#endif //FEATHER_OFFLINETXSIGNINGWIZARD_H
+#endif // FEATHER_OFFLINETXSIGNINGWIZARD_H

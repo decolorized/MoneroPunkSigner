@@ -48,6 +48,11 @@
          <string>File transfer</string>
         </property>
        </item>
+       <item>
+        <property name="text">
+         <string>HID device</string>
+        </property>
+       </item>
       </widget>
      </item>
      <item>
@@ -70,6 +75,8 @@
      <property name="currentIndex">
       <number>0</number>
      </property>
+
+     <!-- Page 0: QR -->
      <widget class="QWidget" name="page">
       <layout class="QVBoxLayout" name="verticalLayout_2">
        <property name="leftMargin">
@@ -117,6 +124,8 @@
        </item>
       </layout>
      </widget>
+
+     <!-- Page 1: Files -->
      <widget class="QWidget" name="page_2">
       <layout class="QVBoxLayout" name="verticalLayout_3">
        <property name="leftMargin">
@@ -157,6 +166,35 @@
        </item>
       </layout>
      </widget>
+
+     <!-- Page 2: HID -->
+     <widget class="QWidget" name="page_hid">
+      <layout class="QVBoxLayout" name="verticalLayout_hid">
+       <property name="leftMargin">
+        <number>0</number>
+       </property>
+       <property name="topMargin">
+        <number>0</number>
+       </property>
+       <property name="rightMargin">
+        <number>0</number>
+       </property>
+       <property name="bottomMargin">
+        <number>0</number>
+       </property>
+       <item>
+        <widget class="QLabel" name="label_hid_info">
+         <property name="text">
+          <string>HID device mode вЂ” the data has been received directly from the device.</string>
+         </property>
+         <property name="wordWrap">
+          <bool>true</bool>
+         </property>
+        </widget>
+       </item>
+      </layout>
+     </widget>
+
     </widget>
    </item>
    <item>

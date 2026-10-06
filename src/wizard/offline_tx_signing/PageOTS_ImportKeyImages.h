@@ -20,13 +20,16 @@ class PageOTS_ImportKeyImages : public PageOTS_Import
 
 public:
     explicit PageOTS_ImportKeyImages(QWidget *parent, Wallet *wallet, TxWizardFields *wizardFields);
-    int nextId() const override;
+    [[nodiscard]] int nextId() const override;
+
+    void initializePage() override;
 
 private slots:
     void importFromStr(const std::string &data) override;
-    
+
 private:
     bool proceed();
+    bool isHidMode() const;
 };
 
-#endif //FEATHER_PAGEOTS_IMPORTKEYIMAGES_H
+#endif // FEATHER_PAGEOTS_IMPORTKEYIMAGES_H
