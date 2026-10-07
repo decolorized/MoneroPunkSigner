@@ -19,8 +19,6 @@ namespace {
 
 constexpr int kHidFirstHdr = 3;   // "?##"
 
-// kFrameStart определён в MwLink.h (дубликат отсюда удалён).
-
 QString deviceDescription(quint16 vid, quint16 pid)
 {
     return QStringLiteral("hid %1:%2")
@@ -176,6 +174,7 @@ void Hid::drain()
 {
     m_rxBuf.clear();
     m_rxExpected = -1;
+    m_lastError.clear();
     if (!m_dev)
         return;
 
@@ -306,12 +305,31 @@ RecvStatus Hid::recv(QByteArray *out, int timeoutMs)
         if (st == RecvStatus::Timeout)
             continue;
 
-        const bool isFrameStart =
-            rep.size() >= int(sizeof(kFrameStart)) &&
-            std::memcmp(rep.constData(), kFrameStart, sizeof(kFrameStart)) == 0;
+        // --- Классификация report'а ---------------------------------------
+        //
+        // Проблема: если буфер сборки пуст, а данных в report'е начинаются
+        // с "?##MW", их можно принять за начало нового кадра, хотя это
+        // может быть продолжение предыдущего (данные внутри полезной
+        // нагрузки тоже могут содержать такую последовательность).
+        //
+        // Правило: пока сборка кадра не завершена (m_rxExpected > 0 и
+        // m_rxBuf.size() < m_rxExpected), любой report, начинающийся с '?',
+        // считается ПРОДОЛЖЕНИЕМ — даже если внутри есть "##MW". Маркер
+        // "?##MW" распознаётся только когда буфер пуст или уже завершён.
+
+        const bool assembling =
+            m_rxExpected > 0 && m_rxBuf.size() < m_rxExpected;
 
         const bool isContinuation =
-            !isFrameStart && rep.size() >= 1 && rep[0] == '?' && !m_rxBuf.isEmpty();
+            assembling &&
+            !m_rxBuf.isEmpty() &&
+            rep.size() >= 1 && rep[0] == '?';
+
+        const bool isFrameStart =
+            !isContinuation &&
+            m_rxBuf.isEmpty() &&
+            rep.size() >= int(sizeof(kFrameStart)) &&
+            std::memcmp(rep.constData(), kFrameStart, sizeof(kFrameStart)) == 0;
 
         if (isFrameStart) {
             m_rxBuf = rep.mid(3);          // "MW" + ...
@@ -324,6 +342,7 @@ RecvStatus Hid::recv(QByteArray *out, int timeoutMs)
             continue;
         }
 
+        // --- Определение полной длины по заголовку ---
         if (m_rxExpected < 0 && m_rxBuf.size() >= kHdrLen) {
             const quint32 plen = quint32(quint8(m_rxBuf[4]))
                                | (quint32(quint8(m_rxBuf[5])) << 8)
@@ -341,6 +360,7 @@ RecvStatus Hid::recv(QByteArray *out, int timeoutMs)
             m_rxExpected = int(total);
         }
 
+        // --- Кадр собран ---
         if (m_rxExpected > 0 && m_rxBuf.size() >= m_rxExpected) {
             *out = m_rxBuf.left(m_rxExpected);
             // Хвост — нулевой паддинг последнего report'а. Сбрасываем целиком,

@@ -185,7 +185,7 @@
        <item>
         <widget class="QLabel" name="label_hid_info">
          <property name="text">
-          <string>HID device mode вЂ” the data has been received directly from the device.</string>
+          <string>HID device mode - the data has been received directly from the device.</string>
          </property>
          <property name="wordWrap">
           <bool>true</bool>

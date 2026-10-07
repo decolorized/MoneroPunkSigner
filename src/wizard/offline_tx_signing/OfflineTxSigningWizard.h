@@ -53,6 +53,10 @@ public:
     TxWizardFields& fields() { return m_wizardFields; }
     const TxWizardFields& fields() const { return m_wizardFields; }
 
+    // Отмена: сбрасываем флаги готовности, чтобы закрытие мастера
+    // не привело к диалогу отправки после успешной подписи.
+    void reject() override;
+
 private:
     Wallet *m_wallet;
     TxWizardFields m_wizardFields;

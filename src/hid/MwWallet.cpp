@@ -54,6 +54,7 @@ Wallet::~Wallet()
 bool Wallet::open(quint16 vid, quint16 pid)
 {
     m_lastError.clear();
+    m_deviceError.clear();
     QString best;   // самая информативная ошибка
 
     auto tryOpen = [&](quint16 p) {
@@ -85,6 +86,7 @@ void Wallet::close()
 {
     m_hid.close();
     m_lastError.clear();
+    m_deviceError.clear();
 }
 
 // ---------------------------------------------------------------------------
@@ -221,6 +223,9 @@ bool Wallet::handleEvent(quint8 cmd, quint8 arg, const QByteArray &payload)
 
 bool Wallet::ping(int *rttMs)
 {
+    m_lastError.clear();
+    m_deviceError.clear();
+
     QElapsedTimer clock;
     clock.start();
 
@@ -276,6 +281,9 @@ bool Wallet::parseInfo(const QByteArray &p, Info *info)
 
 bool Wallet::info(Info *info)
 {
+    m_lastError.clear();
+    m_deviceError.clear();
+
     if (!info) {
         m_lastError = QStringLiteral("info: null output");
         return false;
@@ -316,6 +324,9 @@ bool Wallet::parseStatus(const QByteArray &p, Status *status)
 
 bool Wallet::status(Status *status)
 {
+    m_lastError.clear();
+    m_deviceError.clear();
+
     if (!status) {
         m_lastError = QStringLiteral("status: null output");
         return false;
@@ -358,6 +369,9 @@ bool Wallet::put(Kind kind, const QByteArray &data, Kind *storedAs, int timeoutM
 
 bool Wallet::get(Kind kind, QByteArray *out, int timeoutMs)
 {
+    m_lastError.clear();
+    m_deviceError.clear();
+
     if (!out) {
         m_lastError = QStringLiteral("get: null output");
         return false;
@@ -417,6 +431,7 @@ bool Wallet::waitForResult(Kind resultKind, Kind inputKind, QByteArray *out,
                            int timeoutMs, int pollMs)
 {
     m_lastError.clear();
+    m_deviceError.clear();
     if (!out) {
         m_lastError = QStringLiteral("waitForResult: null output");
         return false;
@@ -472,6 +487,9 @@ bool Wallet::waitForResult(Kind resultKind, Kind inputKind, QByteArray *out,
 
 bool Wallet::clear(Kind kind)
 {
+    m_lastError.clear();
+    m_deviceError.clear();
+
     quint8 cmd = 0;
     if (!call(CmdClear, quint8(kind), {}, &cmd, nullptr, nullptr, 5000))
         return false;
@@ -485,6 +503,9 @@ bool Wallet::clear(Kind kind)
 
 bool Wallet::request(Req what)
 {
+    m_lastError.clear();
+    m_deviceError.clear();
+
     quint8 cmd = 0;
     if (!call(CmdReq, quint8(what), {}, &cmd, nullptr, nullptr, 5000))
         return false;

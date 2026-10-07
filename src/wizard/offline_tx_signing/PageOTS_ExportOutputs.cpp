@@ -171,8 +171,11 @@ void PageOTS_ExportOutputs::setHidState(bool busy,
     ui->btn_export->setEnabled(!busy);
     ui->combo_method->setEnabled(!busy);
 
-    if (ui->label_hid_status)
+    if (ui->label_hid_status) {
+        // Логи устройства — простой текст, не rich text.
+        ui->label_hid_status->setTextFormat(Qt::PlainText);
         ui->label_hid_status->setText(note);
+    }
 
     // Сначала пересчёт QWizard, потом Back — иначе QWizard перезапишет состояние.
     emit completeChanged();
@@ -230,11 +233,15 @@ void PageOTS_ExportOutputs::sendOutputsToHid()
 
     // CLEAR чистит только outbox: убираем возможный устаревший результат до PUT,
     // иначе waitForResult мог бы забрать key images прошлой операции.
+    //
+    // ВАЖНО: шаг КРИТИЧЕСКИЙ. Если очистка не удалась, продолжать нельзя:
+    // waitForResult может забрать из outbox старые key images, не относящиеся
+    // к текущей операции.
     m_op->addStep(QStringLiteral("Preparing device…"),
         [](MwLink::Wallet &dev) -> bool {
             return dev.clear(MwLink::KKeyImages);
         },
-        /*critical=*/false);
+        /*critical=*/true);
 
     m_op->addStep(QStringLiteral("Sending outputs to device…"),
         [blob](MwLink::Wallet &dev) -> bool {
@@ -299,15 +306,19 @@ void PageOTS_ExportOutputs::sendOutputsToHid()
 void PageOTS_ExportOutputs::onHidStep(int index, const QString &description)
 {
     Q_UNUSED(index);
-    if (ui->label_hid_status)
+    if (ui->label_hid_status) {
+        ui->label_hid_status->setTextFormat(Qt::PlainText);
         ui->label_hid_status->setText(description);
+    }
 }
 
 void PageOTS_ExportOutputs::onHidLog(quint8 level, const QString &text)
 {
     if (level == MwLink::LogProgress || level == MwLink::LogInfo) {
-        if (ui->label_hid_status)
+        if (ui->label_hid_status) {
+            ui->label_hid_status->setTextFormat(Qt::PlainText);
             ui->label_hid_status->setText(text);
+        }
     }
 }
 

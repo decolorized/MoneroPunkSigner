@@ -10,6 +10,7 @@ set(QT_COMPONENTS
         Svg
         WebSockets
         SvgWidgets
+        Concurrent
 )
 
 if (WITH_SCANNER)
@@ -106,12 +107,20 @@ if (CHECK_UPDATES)
             "utils/updater/*.cpp")
 endif()
 
+# ---------------------------------------------------------------------------
+# Offline transaction signing wizard
+# ---------------------------------------------------------------------------
+# Файлы визарда офлайн-подписи нужны ВСЕГДА, включая сборку без сканера:
+# HID-подпись работает и при WITH_SCANNER=OFF.
+
+file(GLOB OTS_FILES
+        "wizard/offline_tx_signing/*.h"
+        "wizard/offline_tx_signing/*.cpp")
+
 if (WITH_SCANNER)
     file(GLOB QRCODE_UTILS_FILES
             "qrcode/utils/*.h"
-            "qrcode/utils/*.cpp"
-            "wizard/offline_tx_signing/*.h"
-            "wizard/offline_tx_signing/*.cpp")
+            "qrcode/utils/*.cpp")
 endif()
 
 if (WITH_SCANNER)
@@ -122,6 +131,7 @@ endif()
 
 list(APPEND SOURCE_FILES
         ${UPDATER_FILES}
+        ${OTS_FILES}
         ${QRCODE_UTILS_FILES}
         ${SCANNER_FILES})
 

@@ -11,7 +11,7 @@
 #   • MwLink::HidOperation — фоновый сценарий обмена (QObject)
 #
 # Зависимости:
-#   • Qt5/Qt6 Core, Concurrent
+#   • Qt6 Core, Concurrent
 #   • hidapi (hidapi-hidraw на Linux, hidapi.lib на Windows,
 #             -framework IOKit на macOS)
 #   • zlib (для CRC32)
@@ -20,49 +20,79 @@
 # Зависимости
 # ---------------------------------------------------------------------------
 
-# hidapi через pkg-config (Linux/macOS) или find_package.
-# На Windows обычно ставится через vcpkg или вручную.
-find_package(PkgConfig QUIET)
-if (PkgConfig_FOUND)
-    pkg_check_modules(HIDAPI QUIET hidapi-hidraw)
-    if (NOT HIDAPI_FOUND)
-        pkg_check_modules(HIDAPI QUIET hidapi-libusb)
+# --- hidapi ---
+#
+# На Linux предпочитаем hidraw-бэкенд (работает через udev, не требует libusb).
+# На macOS и Windows — обычный hidapi.
+
+set(HIDAPI_FOUND FALSE)
+set(HIDAPI_INCLUDE_DIRS "")
+set(HIDAPI_LIBRARIES "")
+
+if (UNIX AND NOT APPLE)
+    # Linux: hidraw в приоритете.
+    find_package(PkgConfig QUIET)
+    if (PkgConfig_FOUND)
+        pkg_check_modules(HIDAPI QUIET hidapi-hidraw)
     endif()
+
     if (NOT HIDAPI_FOUND)
+        find_package(hidapi CONFIG QUIET COMPONENTS hidraw)
+        if (hidapi_FOUND)
+            set(HIDAPI_FOUND TRUE)
+            set(HIDAPI_LIBRARIES hidapi::hidapi-hidraw)
+        endif()
+    endif()
+
+    if (NOT HIDAPI_FOUND)
+        find_path(HIDAPI_INCLUDE_DIRS
+            NAMES hidapi/hidapi.h
+            PATHS /usr/include /usr/local/include $ENV{HIDAPI_ROOT}/include
+        )
+        find_library(HIDAPI_LIBRARIES
+            NAMES hidapi-hidraw
+            PATHS /usr/lib /usr/local/lib $ENV{HIDAPI_ROOT}/lib
+        )
+        if (HIDAPI_INCLUDE_DIRS AND HIDAPI_LIBRARIES)
+            set(HIDAPI_FOUND TRUE)
+        endif()
+    endif()
+
+else()
+    # macOS / Windows: обычный hidapi.
+    find_package(PkgConfig QUIET)
+    if (PkgConfig_FOUND)
         pkg_check_modules(HIDAPI QUIET hidapi)
     endif()
-endif()
 
-# Если pkg-config не нашёл — пробуем find_package (CMake-конфиг от vcpkg).
-if (NOT HIDAPI_FOUND)
-    find_package(hidapi CONFIG QUIET)
-    if (hidapi_FOUND)
-        set(HIDAPI_FOUND TRUE)
-        set(HIDAPI_INCLUDE_DIRS "")
-        set(HIDAPI_LIBRARIES hidapi::hidapi)
+    if (NOT HIDAPI_FOUND)
+        find_package(hidapi CONFIG QUIET)
+        if (hidapi_FOUND)
+            set(HIDAPI_FOUND TRUE)
+            set(HIDAPI_LIBRARIES hidapi::hidapi)
+        endif()
     endif()
-endif()
 
-# Если всё ещё не нашли — пробуем стандартный find_path/find_library.
-if (NOT HIDAPI_FOUND)
-    find_path(HIDAPI_INCLUDE_DIRS
-        NAMES hidapi/hidapi.h
-        PATHS
-            /usr/include
-            /usr/local/include
-            /opt/homebrew/include
-            $ENV{HIDAPI_ROOT}/include
-    )
-    find_library(HIDAPI_LIBRARIES
-        NAMES hidapi hidapi-hidraw hidapi-libusb
-        PATHS
-            /usr/lib
-            /usr/local/lib
-            /opt/homebrew/lib
-            $ENV{HIDAPI_ROOT}/lib
-    )
-    if (HIDAPI_INCLUDE_DIRS AND HIDAPI_LIBRARIES)
-        set(HIDAPI_FOUND TRUE)
+    if (NOT HIDAPI_FOUND)
+        find_path(HIDAPI_INCLUDE_DIRS
+            NAMES hidapi/hidapi.h
+            PATHS
+                /usr/include
+                /usr/local/include
+                /opt/homebrew/include
+                $ENV{HIDAPI_ROOT}/include
+        )
+        find_library(HIDAPI_LIBRARIES
+            NAMES hidapi
+            PATHS
+                /usr/lib
+                /usr/local/lib
+                /opt/homebrew/lib
+                $ENV{HIDAPI_ROOT}/lib
+        )
+        if (HIDAPI_INCLUDE_DIRS AND HIDAPI_LIBRARIES)
+            set(HIDAPI_FOUND TRUE)
+        endif()
     endif()
 endif()
 
@@ -75,6 +105,7 @@ if (NOT HIDAPI_FOUND)
     return()
 endif()
 
+# --- zlib ---
 find_package(ZLIB REQUIRED)
 
 # ---------------------------------------------------------------------------
@@ -125,11 +156,15 @@ target_include_directories(feather_hid
 # ---------------------------------------------------------------------------
 # Зависимости
 # ---------------------------------------------------------------------------
+#
+# ВАЖНО: Qt6::Core и Qt6::Concurrent — это конкретные цели Qt6.
+# Не используйте Qt6${QT_VERSION_MAJOR}::Core — это даёт Qt66::Core и ошибку
+# "The Concurrent target is mentioned as a dependency ... but not declared".
 
 target_link_libraries(feather_hid
     PUBLIC
-        Qt${QT_VERSION_MAJOR}::Core
-        Qt${QT_VERSION_MAJOR}::Concurrent
+        Qt6::Core
+        Qt6::Concurrent
     PRIVATE
         ${HIDAPI_LIBRARIES}
         ZLIB::ZLIB
@@ -144,6 +179,12 @@ elseif (APPLE)
         "-framework IOKit"
         "-framework CoreFoundation"
     )
+elseif (UNIX)
+    # hidraw-бэкенд на Linux требует libudev.
+    find_library(UDEV_LIBRARY udev)
+    if (UDEV_LIBRARY)
+        target_link_libraries(feather_hid PRIVATE ${UDEV_LIBRARY})
+    endif()
 endif()
 
 # ---------------------------------------------------------------------------

@@ -20,6 +20,15 @@
 
 #include "utils/config.h"
 
+void OfflineTxSigningWizard::reject() {
+    // После успешной подписи закрытие мастера не должно вести к диалогу отправки:
+    // сбрасываем флаги готовности, чтобы вызывающий код не воспринял
+    // закрытие как подтверждение.
+    m_wizardFields.readyToCommit = false;
+    m_wizardFields.readyToSign = false;
+    QWizard::reject();
+}
+
 OfflineTxSigningWizard::OfflineTxSigningWizard(QWidget *parent, Wallet *wallet, PendingTransaction *tx)
     : QWizard(parent)
     , m_wallet(wallet)

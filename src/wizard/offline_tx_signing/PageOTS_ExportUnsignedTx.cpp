@@ -128,8 +128,11 @@ void PageOTS_ExportUnsignedTx::setHidState(bool busy,
     ui->btn_export->setEnabled(!busy);
     ui->combo_method->setEnabled(!busy);
 
-    if (ui->label_hid_status)
+    if (ui->label_hid_status) {
+        // Логи устройства — простой текст, не rich text.
+        ui->label_hid_status->setTextFormat(Qt::PlainText);
         ui->label_hid_status->setText(note);
+    }
 
     emit completeChanged();
     if (auto *w = wizard()) {
@@ -181,11 +184,15 @@ void PageOTS_ExportUnsignedTx::signOnHid()
 
     // CLEAR чистит только outbox: убираем возможную устаревшую подписанную
     // транзакцию до PUT, чтобы не забрать результат прошлой операции.
+    //
+    // ВАЖНО: шаг КРИТИЧЕСКИЙ. Если очистка не удалась, продолжать нельзя:
+    // waitForResult может забрать из outbox старую подписанную транзакцию
+    // (сумма/комиссия от прошлой операции, адрес — из текущего диалога).
     m_op->addStep(QStringLiteral("Preparing device…"),
         [](MwLink::Wallet &dev) -> bool {
             return dev.clear(MwLink::KSignedTx);
         },
-        /*critical=*/false);
+        /*critical=*/true);
 
     m_op->addStep(QStringLiteral("Sending unsigned tx…"),
         [blob](MwLink::Wallet &dev) -> bool {
@@ -200,6 +207,7 @@ void PageOTS_ExportUnsignedTx::signOnHid()
                                      signedBin.get(), /*timeoutMs=*/600000);
         });
 
+    // При любом исходе (успех, отказ, таймаут, отмена) убираем результат с устройства.
     m_op->addCleanup(QStringLiteral("Clearing device state…"),
         [](MwLink::Wallet &dev) -> bool {
             return dev.clear(MwLink::KSignedTx);
@@ -228,7 +236,19 @@ void PageOTS_ExportUnsignedTx::signOnHid()
                     : m_wallet->errorString();
                 if (error.isEmpty())
                     error = QStringLiteral("Device returned an invalid signed transaction");
-            } else if (auto *w = qobject_cast<OfflineTxSigningWizard*>(wizard())) {
+            }
+            // Защита от подхвата старой подписанной транзакции из outbox устройства:
+            // сверяем сумму и комиссию с исходной unsigned-транзакцией.
+            else if (!m_tx
+                     || tx->amount() != m_tx->amount()
+                     || tx->fee()    != m_tx->fee()) {
+                ok = false;
+                error = QStringLiteral(
+                    "The signed transaction returned by the device does not match "
+                    "the unsigned transaction (amount or fee mismatch). "
+                    "Refusing to continue — possible stale outbox result.");
+            }
+            else if (auto *w = qobject_cast<OfflineTxSigningWizard*>(wizard())) {
                 auto &f = w->fields();
                 f.viaHid        = true;
                 f.tx            = tx;
@@ -253,15 +273,19 @@ void PageOTS_ExportUnsignedTx::signOnHid()
 void PageOTS_ExportUnsignedTx::onHidStep(int index, const QString &description)
 {
     Q_UNUSED(index);
-    if (ui->label_hid_status)
+    if (ui->label_hid_status) {
+        ui->label_hid_status->setTextFormat(Qt::PlainText);
         ui->label_hid_status->setText(description);
+    }
 }
 
 void PageOTS_ExportUnsignedTx::onHidLog(quint8 level, const QString &text)
 {
     if (level == MwLink::LogProgress || level == MwLink::LogInfo) {
-        if (ui->label_hid_status)
+        if (ui->label_hid_status) {
+            ui->label_hid_status->setTextFormat(Qt::PlainText);
             ui->label_hid_status->setText(text);
+        }
     }
 }
 
