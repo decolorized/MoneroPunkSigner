@@ -85,11 +85,14 @@ find_package(Threads REQUIRED)
 find_package(QREncode REQUIRED)
 
 # bc-ur
-if(WITH_SCANNER)
-    find_package(BCUR REQUIRED)
-    if(BCUR_VENDORED)
-        add_subdirectory(src/third-party/bcur EXCLUDE_FROM_ALL)
-    endif()
+#
+# Нужен не только камере, но и генерации QR (URWidget): визард офлайн-подписи
+# собирается и без сканера, а его QR-страницы используют bcur для энкодера UR.
+# FindBCUR.cmake при отсутствии системной библиотеки переключается на
+# вендорную, поэтому вызов безопасен и без сканера.
+find_package(BCUR REQUIRED)
+if(BCUR_VENDORED)
+    add_subdirectory(src/third-party/bcur EXCLUDE_FROM_ALL)
 endif()
 
 # Polyseed

@@ -65,10 +65,12 @@ void PageOTS_ImportSignedTx::initializePage()
                     .arg(f.signedTxSize));
         }
 
+#ifdef FEATHER_HAVE_SCANNER
         if (m_scanWidget) {
             m_scanWidget->reset();
             m_scanWidget->hide();
         }
+#endif
 
         m_success = true;
         this->setButtonText(QWizard::FinishButton, "Review and send");
@@ -95,6 +97,7 @@ void PageOTS_ImportSignedTx::initializePage()
             "Scan the animated QR code shown on the offline wallet.");
     }
 
+#ifdef FEATHER_HAVE_SCANNER
     if (m_scanWidget) {
         m_scanWidget->reset();
         m_scanWidget->show();
@@ -105,14 +108,19 @@ void PageOTS_ImportSignedTx::initializePage()
         }
         m_scanWidget->startCapture(true);
     }
+#endif
 }
 
 void PageOTS_ImportSignedTx::importFromStr(const std::string &data) {
     PendingTransaction *tx = m_wallet->loadSignedTxFromStr(data);
     if (!tx || tx->status() != PendingTransaction::Status_Ok) {
+#ifdef FEATHER_HAVE_SCANNER
         m_scanWidget->pause();
+#endif
         Utils::showError(this, "Failed to import signed transaction", m_wallet->errorString());
+#ifdef FEATHER_HAVE_SCANNER
         m_scanWidget->reset();
+#endif
         return;
     }
 
@@ -151,9 +159,11 @@ bool PageOTS_ImportSignedTx::validatePage() {
     }
 
     // --- QR / Files: старое поведение ---
+#ifdef FEATHER_HAVE_SCANNER
     if (m_scanWidget) {
         m_scanWidget->disconnect();
     }
+#endif
     m_wizardFields->readyToCommit = true;
     return true;
 }

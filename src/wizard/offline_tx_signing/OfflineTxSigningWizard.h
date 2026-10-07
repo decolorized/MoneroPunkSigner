@@ -8,13 +8,18 @@
 #include <QFileDialog>
 
 #include "Wallet.h"
+
+#ifdef FEATHER_HAVE_SCANNER
 #include "qrcode/scanner/QrCodeScanWidget.h"
+#endif
 
 struct TxWizardFields {
     UnsignedTransaction *utx = nullptr;
     PendingTransaction  *tx = nullptr;
     std::string          signedTx;
+#ifdef FEATHER_HAVE_SCANNER
     QrCodeScanWidget    *scanWidget = nullptr;
+#endif
     bool                 readyToCommit = false;
     bool                 readyToSign = false;
     std::string          keyImages;

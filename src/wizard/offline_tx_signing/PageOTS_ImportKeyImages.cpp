@@ -64,10 +64,12 @@ void PageOTS_ImportKeyImages::initializePage()
                 QString("Key images imported (%1 bytes)").arg(f.keyImagesSize));
         }
 
+#ifdef FEATHER_HAVE_SCANNER
         if (m_scanWidget) {
             m_scanWidget->reset();
             m_scanWidget->hide();
         }
+#endif
 
         m_success = true;
         this->setButtonText(QWizard::CommitButton, "Create transaction");
@@ -95,6 +97,7 @@ void PageOTS_ImportKeyImages::initializePage()
             "Scan the animated QR code shown on the offline wallet.");
     }
 
+#ifdef FEATHER_HAVE_SCANNER
     if (m_scanWidget) {
         m_scanWidget->reset();
         m_scanWidget->show();
@@ -105,19 +108,26 @@ void PageOTS_ImportKeyImages::initializePage()
         }
         m_scanWidget->startCapture(true);
     }
+#endif
 }
 
 void PageOTS_ImportKeyImages::importFromStr(const std::string &data) {
     if (!proceed()) {
+#ifdef FEATHER_HAVE_SCANNER
         m_scanWidget->reset();
+#endif
         return;
     }
 
     bool r = m_wallet->importKeyImagesFromStr(data);
     if (!r) {
+#ifdef FEATHER_HAVE_SCANNER
         m_scanWidget->pause();
+#endif
         Utils::showError(this, "Failed to import key images", m_wallet->errorString());
+#ifdef FEATHER_HAVE_SCANNER
         m_scanWidget->reset();
+#endif
         return;
     }
 

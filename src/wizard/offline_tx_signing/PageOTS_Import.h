@@ -6,7 +6,9 @@
 
 #include <QWizardPage>
 #include "Wallet.h"
+#ifdef FEATHER_HAVE_SCANNER
 #include "qrcode/scanner/QrCodeScanWidget.h"
+#endif
 #include "OfflineTxSigningWizard.h"
 
 namespace Ui {
@@ -23,8 +25,10 @@ public:
     bool validatePage() override;
     bool isComplete() const override;
 
+#ifdef FEATHER_HAVE_SCANNER
 public slots:
     void onScanFinished(bool success);
+#endif
 
 private:
     virtual void importFromStr(const std::string &data) = 0;
@@ -35,7 +39,9 @@ protected:
 
     Ui::PageOTS_Import *ui;
     TxWizardFields *m_wizardFields;
+#ifdef FEATHER_HAVE_SCANNER
     QrCodeScanWidget *m_scanWidget;
+#endif
     bool m_success = false;
     Wallet *m_wallet;
     QString m_type;

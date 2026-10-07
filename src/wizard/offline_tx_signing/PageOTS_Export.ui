@@ -47,7 +47,7 @@
     </layout>
    </item>
 
-   <!-- label_step (СЃРєСЂС‹С‚ РІ C++) -->
+
    <item>
     <widget class="QLabel" name="label_step">
      <property name="text">
@@ -56,7 +56,7 @@
     </widget>
    </item>
 
-   <!-- РЎС‚РµРє СЃС‚СЂР°РЅРёС† -->
+
    <item>
     <widget class="QStackedWidget" name="stackedWidget">
      <property name="currentIndex">
@@ -89,7 +89,7 @@
       </layout>
      </widget>
 
-     <!-- Page 1: Files (РїСѓСЃС‚Рѕ, РєРЅРѕРїРєР° РІС‹РЅРµСЃРµРЅР° РЅР°СЂСѓР¶Сѓ) -->
+     <!-- Page 1: Files  -->
      <widget class="QWidget" name="page_files">
       <layout class="QVBoxLayout" name="verticalLayout_3"/>
      </widget>
@@ -137,7 +137,7 @@ Confirm the operation on the device when prompted.</string>
     </widget>
    </item>
 
-   <!-- РљРЅРѕРїРєР° РґРµР№СЃС‚РІРёСЏ: РѕРґРЅР° РЅР° РІСЃРµ РјРµС‚РѕРґС‹, С‚РµРєСЃС‚ РјРµРЅСЏРµС‚СЃСЏ РІ C++ -->
+
    <item>
     <layout class="QHBoxLayout" name="horizontalLayout_actions">
      <item>
@@ -163,7 +163,7 @@ Confirm the operation on the device when prompted.</string>
     </layout>
    </item>
 
-   <!-- layout_extra: СЃСЋРґР° РґРѕР±Р°РІР»СЏРµС‚СЃСЏ m_check_exportAll РІ C++ -->
+   
    <item>
     <layout class="QVBoxLayout" name="layout_extra"/>
    </item>

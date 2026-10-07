@@ -39,9 +39,13 @@
 
 #include "wallet/wallet_errors.h"
 
-#ifdef WITH_SCANNER
+// Визард офлайн-подписи собирается и без камеры (FEATHER_HAVE_OTS_WIZARD), но
+// URDialog — часть камерного сканера, поэтому включён отдельным гардом.
+#ifdef FEATHER_HAVE_SCANNER
 #include "wizard/offline_tx_signing/OfflineTxSigningWizard.h"
 #include "qrcode/scanner/URDialog.h"
+#elif defined(FEATHER_HAVE_OTS_WIZARD)
+#include "wizard/offline_tx_signing/OfflineTxSigningWizard.h"
 #endif
 
 #ifdef CHECK_UPDATES
@@ -963,7 +967,7 @@ void MainWindow::onTransactionCreated(PendingTransaction *tx, const QVector<QStr
 
     // Offline transaction signing
     if (m_wallet->viewOnly()) {
-#ifdef WITH_SCANNER
+#ifdef FEATHER_HAVE_OTS_WIZARD
         OfflineTxSigningWizard wizard(this, m_wallet, tx);
         wizard.exec();
         
@@ -1138,7 +1142,7 @@ void MainWindow::showViewOnlyDialog() {
 }
 
 void MainWindow::showKeyImageSyncWizard() {
-#ifdef WITH_SCANNER
+#ifdef FEATHER_HAVE_OTS_WIZARD
     OfflineTxSigningWizard wizard{this, m_wallet};
     wizard.exec();
 

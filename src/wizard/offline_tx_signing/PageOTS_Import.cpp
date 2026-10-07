@@ -31,7 +31,9 @@ PageOTS_Import::PageOTS_Import(QWidget *parent,
         : QWizardPage(parent)
         , m_wallet(wallet)
         , m_wizardFields(wizardFields)
+#ifdef FEATHER_HAVE_SCANNER
         , m_scanWidget(wizardFields ? wizardFields->scanWidget : nullptr)
+#endif
         , m_type(type)
         , m_fileType(fileType)
         , m_successButtonText(successButtonText)
@@ -73,6 +75,11 @@ PageOTS_Import::PageOTS_Import(QWidget *parent,
 // ---------------------------------------------------------------------------
 // Сканирование QR
 // ---------------------------------------------------------------------------
+//
+// Только при наличии камеры (FEATHER_HAVE_SCANNER). Без сканера визард
+// работает через файлы и HID, поэтому слот и его подключение отсутствуют.
+
+#ifdef FEATHER_HAVE_SCANNER
 
 void PageOTS_Import::onScanFinished(bool success)
 {
@@ -86,6 +93,8 @@ void PageOTS_Import::onScanFinished(bool success)
     std::string data = m_scanWidget->getURData();
     importFromStr(data);
 }
+
+#endif // FEATHER_HAVE_SCANNER
 
 // ---------------------------------------------------------------------------
 // Успех
@@ -164,6 +173,7 @@ void PageOTS_Import::initializePage()
         ui->stackedWidget->setCurrentIndex(method);
     }
 
+#ifdef FEATHER_HAVE_SCANNER
     if (m_scanWidget) {
         m_scanWidget->reset();
         connect(m_scanWidget, &QrCodeScanWidget::finished,
@@ -173,6 +183,7 @@ void PageOTS_Import::initializePage()
         }
         m_scanWidget->startCapture(true);
     }
+#endif
 }
 
 // ---------------------------------------------------------------------------
@@ -186,9 +197,11 @@ bool PageOTS_Import::isComplete() const
 
 bool PageOTS_Import::validatePage()
 {
+#ifdef FEATHER_HAVE_SCANNER
     if (m_scanWidget) {
         m_scanWidget->disconnect();
         m_scanWidget->pause();
     }
+#endif
     return true;
 }

@@ -6,7 +6,6 @@
 
 #include <QWizardPage>
 #include "Wallet.h"
-#include "qrcode/scanner/QrCodeScanWidget.h"
 #include "OfflineTxSigningWizard.h"
 #include "PageOTS_Import.h"
 

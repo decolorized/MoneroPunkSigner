@@ -25,11 +25,38 @@ ENDIF()
 
 find_package(Qt6 REQUIRED COMPONENTS ${QT_COMPONENTS})
 
+# ---------------------------------------------------------------------------
+# HID support (mwlink protocol)
+# ---------------------------------------------------------------------------
+# Сначала создаём цель feather_hid: если hidapi/zlib не найдены, её не будет
+# (см. src/hid/CMakeLists.txt, ранний return()).
+add_subdirectory(hid)
+
+# Файлы src/hid/*.{h,cpp} собираются отдельной библиотекой feather_hid и
+# подключаются как зависимость ниже, в SOURCE_FILES их добавлять не нужно.
+#
+# Проверка цели идёт ДО глоба исходников: от неё зависит, нужен ли вообще
+# визард офлайн-подписи (см. FEATHER_HAVE_OTS_WIZARD ниже).
+set(FEATHER_HAVE_HID OFF)
+if (TARGET feather_hid)
+    set(FEATHER_HAVE_HID ON)
+    message(STATUS "Feather: HID support enabled (feather_hid target found)")
+else()
+    message(STATUS "Feather: HID support disabled (no feather_hid target)")
+endif()
+
+# Визард офлайн-подписи имеет смысл, только если есть хоть один способ
+# обмена с холодным кошельком: камера (QR) или HID-устройство.
+if (WITH_SCANNER OR FEATHER_HAVE_HID)
+    set(FEATHER_HAVE_OTS_WIZARD ON)
+else()
+    set(FEATHER_HAVE_OTS_WIZARD OFF)
+    message(STATUS "Feather: offline tx signing wizard disabled (no scanner, no HID)")
+endif()
+
 if (CHECK_UPDATES)
     add_subdirectory(openpgp)
 endif()
-
-add_subdirectory(hid)
 
 qt_add_resources(RESOURCES assets.qrc assets_tor.qrc assets_docs.qrc)
 
@@ -110,48 +137,61 @@ endif()
 # ---------------------------------------------------------------------------
 # Offline transaction signing wizard
 # ---------------------------------------------------------------------------
-# Файлы визарда офлайн-подписи нужны ВСЕГДА, включая сборку без сканера:
-# HID-подпись работает и при WITH_SCANNER=OFF.
+# С появлением HID-подписи визард больше не привязан к камере: при
+# WITH_SCANNER=OFF остаются QR-показ, файлы и HID, исчезают только приём QR
+# камерой и ZXing. Сканер-специфичный код внутри визарда закрыт
+# FEATHER_HAVE_SCANNER.
+#
+# Собирается, когда есть хоть один способ обмена с холодным кошельком
+# (FEATHER_HAVE_OTS_WIZARD). Если нет ни камеры, ни HID — файлы не
+# компилируются вообще, иначе HID-ветки внутри визарда дали бы
+# неразрешённые символы MwLink::*.
 
-file(GLOB OTS_FILES
-        "wizard/offline_tx_signing/*.h"
-        "wizard/offline_tx_signing/*.cpp")
+if (FEATHER_HAVE_OTS_WIZARD)
+    file(GLOB OTS_FILES
+            "wizard/offline_tx_signing/*.h"
+            "wizard/offline_tx_signing/*.cpp")
+endif()
 
+# URWidget — это ГЕНЕРАЦИЯ QR (bcur + QREncode), камеры не требует,
+# а на него ссылается ui_PageOTS_Export.h из общих для визарда страниц
+# экспорта. Поэтому собирается вместе с визардом (в т.ч. без камеры),
+# но не в сборке, где визарда нет вообще.
+set(UR_WIDGET_FILES)
+if (FEATHER_HAVE_OTS_WIZARD)
+    set(UR_WIDGET_FILES
+            "qrcode/scanner/URWidget.h"
+            "qrcode/scanner/URWidget.cpp")
+endif()
+
+# Приём QR камерой: QrCodeScanWidget/QrScanThread (Qt Multimedia) и
+# qrcode/utils (ZXing). Только со сканером.
 if (WITH_SCANNER)
     file(GLOB QRCODE_UTILS_FILES
             "qrcode/utils/*.h"
             "qrcode/utils/*.cpp")
-endif()
 
-if (WITH_SCANNER)
-    file(GLOB SCANNER_FILES
-            "qrcode/scanner/*.h"
-            "qrcode/scanner/*.cpp")
+    set(SCANNER_FILES
+            "qrcode/scanner/QrCodeScanWidget.h"
+            "qrcode/scanner/QrCodeScanWidget.cpp"
+            "qrcode/scanner/QrCodeScanWidget.ui"
+            "qrcode/scanner/QrScanThread.h"
+            "qrcode/scanner/QrScanThread.cpp")
 endif()
 
 list(APPEND SOURCE_FILES
         ${UPDATER_FILES}
         ${OTS_FILES}
+        ${UR_WIDGET_FILES}
         ${QRCODE_UTILS_FILES}
         ${SCANNER_FILES})
 
 # ---------------------------------------------------------------------------
 # HID support (mwlink protocol)
 # ---------------------------------------------------------------------------
-# Файлы src/hid/*.{h,cpp} собираются отдельной библиотекой feather_hid,
-# которая подключается как зависимость (см. ниже). В SOURCE_FILES
-# их добавлять НЕ нужно — они не часть target feather напрямую.
-#
-# Здесь только проверяем, определена ли цель feather_hid (создаётся
-# в src/hid/CMakeLists.txt через add_subdirectory в корневом CMakeLists).
-
-set(FEATHER_HAVE_HID OFF)
-if (TARGET feather_hid)
-    set(FEATHER_HAVE_HID ON)
-    message(STATUS "Feather: HID support enabled (feather_hid target found)")
-else()
-    message(STATUS "Feather: HID support disabled (no feather_hid target)")
-endif()
+# Признак FEATHER_HAVE_HID определён выше (сразу после add_subdirectory(hid)),
+# потому что от него зависит FEATHER_HAVE_OTS_WIZARD. Здесь только
+# подключаем библиотеку — см. блок target_link_libraries ниже.
 
 set(EXECUTABLE_FLAG)
 if(MINGW)
@@ -255,6 +295,30 @@ endif()
 
 if(WITH_SCANNER)
     target_compile_definitions(feather PRIVATE WITH_SCANNER=1)
+endif()
+
+# ---------------------------------------------------------------------------
+# Scanner compile definition
+# ---------------------------------------------------------------------------
+# Визард офлайн-подписи собирается и без камеры. FEATHER_HAVE_SCANNER=1
+# означает «есть приём QR камерой»: только тогда компилируются
+# QrCodeScanWidget/QrScanThread и ссылки на них в визарде.
+#
+# WITH_SCANNER (upstream) остаётся для остального кода Feather (SendWidget,
+# URDialog в MainWindow) и всегда совпадает с FEATHER_HAVE_SCANNER.
+if (WITH_SCANNER)
+    target_compile_definitions(feather PRIVATE FEATHER_HAVE_SCANNER=1)
+endif()
+
+# ---------------------------------------------------------------------------
+# Offline transaction signing wizard availability
+# ---------------------------------------------------------------------------
+# Визард нужен, если есть хоть один способ обмена с холодным кошельком:
+# камера (QR) или HID-устройство. Без обоих он не собирается/не открывается,
+# поэтому входные точки (MainWindow, CoinsWidget) закрыты одним макросом.
+# Само значение FEATHER_HAVE_OTS_WIZARD вычислено выше, до глоба исходников.
+if (FEATHER_HAVE_OTS_WIZARD)
+    target_compile_definitions(feather PRIVATE FEATHER_HAVE_OTS_WIZARD=1)
 endif()
 
 # ---------------------------------------------------------------------------

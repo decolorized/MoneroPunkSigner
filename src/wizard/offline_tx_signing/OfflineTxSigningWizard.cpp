@@ -33,7 +33,9 @@ OfflineTxSigningWizard::OfflineTxSigningWizard(QWidget *parent, Wallet *wallet, 
     : QWizard(parent)
     , m_wallet(wallet)
 {
+#ifdef FEATHER_HAVE_SCANNER
     m_wizardFields.scanWidget = new QrCodeScanWidget(nullptr);
+#endif
 
     // View-only
     setPage(Page_ExportOutputs, new PageOTS_ExportOutputs(this, m_wallet));

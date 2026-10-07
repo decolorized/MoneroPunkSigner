@@ -21,9 +21,13 @@ void PageOTS_ImportUnsignedTx::importFromStr(const std::string &data) {
     UnsignedTransaction *utx = m_wallet->loadUnsignedTransactionFromStr(data);
 
     if (!utx || utx->status() != UnsignedTransaction::Status_Ok) {
+#ifdef FEATHER_HAVE_SCANNER
         m_scanWidget->pause();
+#endif
         Utils::showError(this, "Failed to import unsigned transaction", m_wallet->errorString());
+#ifdef FEATHER_HAVE_SCANNER
         m_scanWidget->reset();
+#endif
         return;
     }
 

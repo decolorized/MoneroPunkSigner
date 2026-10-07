@@ -11,7 +11,7 @@
 #include "utils/Icons.h"
 #include "utils/Utils.h"
 
-#ifdef WITH_SCANNER
+#ifdef FEATHER_HAVE_OTS_WIZARD
 #include "wizard/offline_tx_signing/OfflineTxSigningWizard.h"
 #endif
 
@@ -258,7 +258,7 @@ void CoinsWidget::onSweepOutputs() {
     if (!ret) return;
 
     if (m_wallet->keyImageSyncNeeded(totalAmount, false)) {
-#if defined(WITH_SCANNER)
+#ifdef FEATHER_HAVE_OTS_WIZARD
         OfflineTxSigningWizard wizard(this, m_wallet);
         auto r = wizard.exec();
     

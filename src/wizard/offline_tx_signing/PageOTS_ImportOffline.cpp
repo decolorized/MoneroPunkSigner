@@ -23,7 +23,9 @@ void PageOTS_ImportOffline::importFromStr(const std::string &data) {
         std::string keyImages;
         bool r = m_wallet->exportKeyImagesForOutputsFromStr(data, keyImages);
         if (!r) {
+#ifdef FEATHER_HAVE_SCANNER
             m_scanWidget->pause();
+#endif
             message.title = "Failed to import outputs";
             QString error = m_wallet->errorString();
             message.description = error;
@@ -31,7 +33,9 @@ void PageOTS_ImportOffline::importFromStr(const std::string &data) {
                 message.helpItems = {"You may have opened the wrong view-only wallet."};
             }
             Utils::showMsg(message);
+#ifdef FEATHER_HAVE_SCANNER
             m_scanWidget->reset();
+#endif
             return;
         }
 
@@ -43,7 +47,9 @@ void PageOTS_ImportOffline::importFromStr(const std::string &data) {
         UnsignedTransaction *utx = m_wallet->loadUnsignedTransactionFromStr(data);
 
         if (!utx || utx->status() != UnsignedTransaction::Status_Ok) {
+#ifdef FEATHER_HAVE_SCANNER
             m_scanWidget->pause();
+#endif
             message.title = "Failed to import unsigned transaction";
             QString error = m_wallet->errorString();
             message.description = error;
@@ -51,7 +57,9 @@ void PageOTS_ImportOffline::importFromStr(const std::string &data) {
                 message.helpItems = {"You may have opened the wrong view-only wallet."};
             }
             Utils::showMsg(message);
+#ifdef FEATHER_HAVE_SCANNER
             m_scanWidget->reset();
+#endif
             return;
         }
 
@@ -62,7 +70,9 @@ void PageOTS_ImportOffline::importFromStr(const std::string &data) {
     }
     else {
         Utils::showError(this, "Failed to import outputs or unsigned transaction", "Unrecognized data");
+#ifdef FEATHER_HAVE_SCANNER
         m_scanWidget->reset();
+#endif
         return;
     }
 
