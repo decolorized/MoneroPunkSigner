@@ -19,7 +19,7 @@ This document is written for developers and users interested in learning how Fea
 
 Goals:
 
-- Set up a bug bounty program for issues that affect privacy or security
+
 - Set up a status page with information about project health
 - Set up a feed for security bulletins
 - Sandbox components that handle untrusted input (e.g. QR code scanner)
