@@ -12,6 +12,7 @@
 #include <QMessageBox>
 #include <QPushButton>
 #include <QSignalBlocker>
+#include <QTimer>
 
 #include <memory>
 
@@ -361,20 +362,6 @@ void PageOTS_ExportOutputs::onHidFinished(bool ok, const QString &error)
     m_hidDone = true;
     m_hidError.clear();
 
-    // Обмен закончен, дальше остаётся одно действие:
-    //   • только синхронизация → закрыть мастер («Finish»);
-    //   • синхронизация + отправка → показать транзакцию и отправить её
-    //     («View transaction»).
-    //
-    // Переименовываем именно Next: QWizard показывает Finish только когда
-    // nextId() == -1, а в этом случае Next скрывается и перестаёт работать.
-    // Next виден всегда и обрабатывается в validatePage() ниже.
-    if (auto *w = qobject_cast<OfflineTxSigningWizard*>(wizard())) {
-        w->setActionButtonText(QWizard::NextButton,
-                               isSyncOnlyRun() ? QStringLiteral("Finish")
-                                               : QStringLiteral("View transaction"));
-    }
-
     setHidState(false,
         isSyncOnlyRun()
             ? QStringLiteral("✅ Key images synchronized and imported.\n"
@@ -382,6 +369,20 @@ void PageOTS_ExportOutputs::onHidFinished(bool ok, const QString &error)
             : QStringLiteral("✅ Key images imported successfully.\n"
                              "Press «View transaction» to continue."),
         true);
+
+    // Надпись ставим ПОСЛЕ setHidState(): он эмитит completeChanged, и подпись
+    // должна остаться последним изменением кнопки.
+    //
+    // Переименовываем Next, а не Finish: QWizard показывает Finish только при
+    // nextId() == -1, а тогда Next скрывается и перестаёт работать. Next виден
+    // всегда, а выход из мастера для «только синхронизации» делает
+    // validatePage().
+    if (auto *w = qobject_cast<OfflineTxSigningWizard*>(wizard())) {
+        const QString label = isSyncOnlyRun() ? QStringLiteral("Finish")
+                                              : QStringLiteral("View transaction");
+        w->setActionButtonText(QWizard::NextButton, label);
+        w->setActionButtonText(QWizard::FinishButton, label);
+    }
 }
 
 #else  // !FEATHER_HAVE_HID
@@ -462,9 +463,15 @@ bool PageOTS_ExportOutputs::validatePage() {
 #ifdef FEATHER_HAVE_HID
     // «Только синхронизация»: key images уже в кошельке, следующий экран не
     // нужен — закрываем мастер принятием (accept), без перехода вперёд.
+    //
+    // ВАЖНО: validatePage() вызывается из QWizard::next() по сигналу clicked()
+    // кнопки, поэтому accept() откладываем на следующий цикл событий —
+    // закрытие мастера прямо в обработке нажатия приводит к падению.
     if (isHidMode() && isSyncOnlyRun() && m_hidDone && m_hidError.isEmpty()) {
-        if (auto *w = wizard())
-            w->accept();
+        QTimer::singleShot(0, this, [this] {
+            if (auto *w = wizard())
+                w->accept();
+        });
         return false;   // не переходим на Page_ExportUnsignedTx
     }
 #endif

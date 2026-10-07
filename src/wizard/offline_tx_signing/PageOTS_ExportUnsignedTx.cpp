@@ -9,6 +9,7 @@
 #include <QMessageBox>
 #include <QPushButton>
 #include <QSignalBlocker>
+#include <QTimer>
 
 #include <memory>
 
@@ -307,17 +308,20 @@ void PageOTS_ExportUnsignedTx::onHidFinished(bool ok, const QString &error)
 
     m_hidDone = true;
     m_hidError.clear();
-    // Подписанная транзакция уже загружена в fields().tx: экран-заглушка
-    // «Signed transaction received» не нужен. Переименовываем Next (он всегда
-    // виден), а выход из мастера делает validatePage().
     m_signedRxViaHid = true;
-    if (auto *w = qobject_cast<OfflineTxSigningWizard*>(wizard()))
-        w->setActionButtonText(QWizard::NextButton, QStringLiteral("View transaction"));
 
     setHidState(false,
         QStringLiteral("✅ Transaction signed on device.\n"
                        "Press «View transaction» to review and send."),
         /*success=*/true);
+
+    // Надпись ставим ПОСЛЕ setHidState(): он эмитит completeChanged, и подпись
+    // должна остаться последним изменением кнопки. Next — рабочая кнопка
+    // (Finish на этой странице не показывается, но подстрахуемся).
+    if (auto *w = qobject_cast<OfflineTxSigningWizard*>(wizard())) {
+        w->setActionButtonText(QWizard::NextButton, QStringLiteral("View transaction"));
+        w->setActionButtonText(QWizard::FinishButton, QStringLiteral("View transaction"));
+    }
 }
 
 #else  // !FEATHER_HAVE_HID
@@ -391,9 +395,17 @@ bool PageOTS_ExportUnsignedTx::validatePage() {
 #ifdef FEATHER_HAVE_HID
     // Подпись на устройстве завершена: подписанная транзакция уже в
     // fields().tx, показываем её и отправляем — без промежуточного экрана.
+    //
+    // ВАЖНО: validatePage() вызывается из QWizard::next(), а тот — из сигнала
+    // clicked() кнопки. Закрывать мастер прямо здесь нельзя: accept() во время
+    // обработки нажатия приводит к падению. Поэтому выход откладываем на
+    // следующий цикл событий (контекст this — если страница умрёт, вызов
+    // отменится).
     if (m_signedRxViaHid) {
-        if (auto *w = wizard())
-            w->accept();
+        QTimer::singleShot(0, this, [this] {
+            if (auto *w = wizard())
+                w->accept();
+        });
         return false;   // не переходим на Page_ImportSignedTx
     }
 #endif
