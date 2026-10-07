@@ -26,6 +26,7 @@ public:
     void initializePage() override;
     [[nodiscard]] int nextId() const override;
     [[nodiscard]] bool isComplete() const override;
+    bool validatePage() override;
 
 private slots:
     void exportUnsignedTx();

@@ -71,6 +71,17 @@ public:
     TxWizardFields& fields() { return m_wizardFields; }
     const TxWizardFields& fields() const { return m_wizardFields; }
 
+    // Безопасная подмена подписи навигационной кнопки.
+    //
+    // QWizard восстанавливает текст кнопок по умолчанию ТОЛЬКО в
+    // updateButtonTexts(), а её вызывают лишь смена страницы и стиля. Поэтому
+    // прямой setText(QString()) оставляет кнопку без надписи: сброс через
+    // setButtonText() убирает кастомный текст, и QWizard сам вернёт «&Finish»
+    // или «&Next >» при следующей смене страницы.
+    //
+    // which — какая кнопка переименовывается (обычно NextButton).
+    void setActionButtonText(QWizard::WizardButton which, const QString &text);
+
     // Отмена: сбрасываем флаги готовности, чтобы закрытие мастера
     // не привело к диалогу отправки после успешной подписи.
     void reject() override;

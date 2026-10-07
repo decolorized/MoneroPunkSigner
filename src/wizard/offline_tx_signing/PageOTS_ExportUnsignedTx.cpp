@@ -307,15 +307,13 @@ void PageOTS_ExportUnsignedTx::onHidFinished(bool ok, const QString &error)
 
     m_hidDone = true;
     m_hidError.clear();
-    // Подписанная транзакция уже загружена в fields().tx: экран
-    // «Signed transaction received» был бы пустой заглушкой, поэтому кнопка
-    // называется «View transaction» и сразу показывает транзакцию для
-    // подтверждения и отправки (nextId() == -1).
+    // Подписанная транзакция уже загружена в fields().tx: экран-заглушка
+    // «Signed transaction received» не нужен. Переименовываем Next (он всегда
+    // виден), а выход из мастера делает validatePage().
     m_signedRxViaHid = true;
-    if (auto *w = wizard()) {
-        if (auto *finish = w->button(QWizard::FinishButton))
-            finish->setText(QStringLiteral("View transaction"));
-    }
+    if (auto *w = qobject_cast<OfflineTxSigningWizard*>(wizard()))
+        w->setActionButtonText(QWizard::NextButton, QStringLiteral("View transaction"));
+
     setHidState(false,
         QStringLiteral("✅ Transaction signed on device.\n"
                        "Press «View transaction» to review and send."),
@@ -354,10 +352,9 @@ void PageOTS_ExportUnsignedTx::initializePage() {
     m_hidError.clear();
     m_hidBusy  = false;
     m_signedRxViaHid = false;
-    if (auto *w = wizard()) {
-        if (auto *finish = w->button(QWizard::FinishButton))
-            finish->setText(QString());
-    }
+    // Возвращаем стандартную надпись кнопки (её меняет onHidFinished()).
+    if (auto *w = qobject_cast<OfflineTxSigningWizard*>(wizard()))
+        w->setActionButtonText(QWizard::NextButton, QStringLiteral("Next"));
     if (m_op) {
         m_op->disconnect(this);
         m_op->cancel();
@@ -383,13 +380,22 @@ void PageOTS_ExportUnsignedTx::initializePage() {
 }
 
 int PageOTS_ExportUnsignedTx::nextId() const {
+    // Всегда возвращаем настоящую следующую страницу: при -1 QWizard скрывает
+    // Next и игнорирует его нажатие. Для HID выход из мастера делает
+    // validatePage(), поэтому экран-заглушка «Signed transaction received»
+    // пропускается без потери кнопки.
+    return OfflineTxSigningWizard::Page_ImportSignedTx;
+}
+
+bool PageOTS_ExportUnsignedTx::validatePage() {
 #ifdef FEATHER_HAVE_HID
     // Подпись на устройстве завершена: подписанная транзакция уже в
-    // fields().tx, поэтому экран-заглушка «Signed transaction received»
-    // пропускается — кнопка «View transaction» сразу показывает транзакцию
-    // и отправляет её.
-    if (m_signedRxViaHid)
-        return -1;
+    // fields().tx, показываем её и отправляем — без промежуточного экрана.
+    if (m_signedRxViaHid) {
+        if (auto *w = wizard())
+            w->accept();
+        return false;   // не переходим на Page_ImportSignedTx
+    }
 #endif
-    return OfflineTxSigningWizard::Page_ImportSignedTx;
+    return true;
 }

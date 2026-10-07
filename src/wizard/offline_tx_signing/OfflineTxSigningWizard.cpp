@@ -29,6 +29,24 @@ void OfflineTxSigningWizard::reject() {
     QWizard::reject();
 }
 
+void OfflineTxSigningWizard::setActionButtonText(QWizard::WizardButton which, const QString &text)
+{
+    if (!button(which))
+        return;
+
+    // Текст для этой кнопки на текущей странице мог быть задан через
+    // QWizardPage::setButtonText() (например «Review and send» на странице
+    // экспорта подписанной транзакции) — он имеет приоритет над нашим,
+    // поэтому снимаем его.
+    if (currentPage())
+        currentPage()->setButtonText(which, QString());
+
+    // Пустая строка означает «вернуть стандартную надпись»: setButtonText
+    // удаляет кастомный текст, а QWizard вернёт «&Finish»/«&Next >» сам.
+    // Прямой setText(QString()) так нельзя — надпись останется пустой.
+    setButtonText(which, text);
+}
+
 OfflineTxSigningWizard::OfflineTxSigningWizard(QWidget *parent, Wallet *wallet, PendingTransaction *tx)
     : QWizard(parent)
     , m_wallet(wallet)

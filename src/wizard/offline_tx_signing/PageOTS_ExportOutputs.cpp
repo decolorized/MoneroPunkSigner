@@ -315,13 +315,10 @@ void PageOTS_ExportOutputs::sendOutputsToHid()
     m_hidError.clear();
     setHidState(true, QStringLiteral("Starting…"));
 
-    // setText кнопки живёт до конца жизни виджета: сбрасываем подпись
-    // «View transaction» от прошлой операции, иначе она всплывёт в сессии
-    // «только синхронизация», где нужна обычная Finish.
-    if (auto *w = wizard()) {
-        if (auto *finish = w->button(QWizard::FinishButton))
-            finish->setText(QString());
-    }
+    // Подпись кнопки живёт до конца жизни виджета: убираем «Finish» /
+    // «View transaction» от прошлой операции, пока новая не завершилась.
+    if (auto *w = qobject_cast<OfflineTxSigningWizard*>(wizard()))
+        w->setActionButtonText(QWizard::NextButton, QStringLiteral("Next"));
 
     m_op->start();
 }
@@ -364,19 +361,18 @@ void PageOTS_ExportOutputs::onHidFinished(bool ok, const QString &error)
     m_hidDone = true;
     m_hidError.clear();
 
-    // Сценарий «синхронизация + отправка»: обмен с устройством закончен, и
-    // дальше остаётся только показать полученную транзакцию и отправить её.
-    // Кнопку (QWizard показывает на этой странице Finish) называем
-    // «View transaction» — как и на экране подписи.
-    if (!isSyncOnlyRun()) {
-        if (auto *w = wizard()) {
-            if (auto *finish = w->button(QWizard::FinishButton))
-                finish->setText(QStringLiteral("View transaction"));
-        }
-    } else if (auto *w = wizard()) {
-        // Обратный случай: в этой сессии нужна обычная Finish.
-        if (auto *finish = w->button(QWizard::FinishButton))
-            finish->setText(QString());
+    // Обмен закончен, дальше остаётся одно действие:
+    //   • только синхронизация → закрыть мастер («Finish»);
+    //   • синхронизация + отправка → показать транзакцию и отправить её
+    //     («View transaction»).
+    //
+    // Переименовываем именно Next: QWizard показывает Finish только когда
+    // nextId() == -1, а в этом случае Next скрывается и перестаёт работать.
+    // Next виден всегда и обрабатывается в validatePage() ниже.
+    if (auto *w = qobject_cast<OfflineTxSigningWizard*>(wizard())) {
+        w->setActionButtonText(QWizard::NextButton,
+                               isSyncOnlyRun() ? QStringLiteral("Finish")
+                                               : QStringLiteral("View transaction"));
     }
 
     setHidState(false,
@@ -428,6 +424,10 @@ void PageOTS_ExportOutputs::initializePage() {
     if (ui->label_hid_status)
         ui->label_hid_status->clear();
 
+    // При входе на страницу возвращаем стандартную надпись кнопки.
+    if (auto *w = qobject_cast<OfflineTxSigningWizard*>(wizard()))
+        w->setActionButtonText(QWizard::NextButton, QStringLiteral("Next"));
+
     // viaHid описывает только эту страницу: сбрасываем при каждом входе.
     if (auto *w = qobject_cast<OfflineTxSigningWizard*>(wizard()))
         w->fields().viaHid = false;
@@ -448,14 +448,25 @@ int PageOTS_ExportOutputs::nextId() const {
     // HID-ветка: экран «2. Key images received» больше не показываем — key
     // images уже импортированы в кошелёк на этом шаге.
     //
-    //   • только синхронизация (мастер без PendingTransaction) → -1:
-    //     QWizard завершает мастер по Finish, экран unsigned tx не нужен;
-    //   • синхронизация + отправка → сразу «3. Export unsigned transaction».
-    if (isHidMode()) {
-        if (isSyncOnlyRun())
-            return -1;
+    // ВАЖНО: возвращаем настоящий id следующей страницы, а не -1. При -1
+    // QWizard выставляет canContinue = false, скрывает Next и игнорирует его
+    // нажатие (QWizard::next() ничего не делает при nextId() == -1).
+    // Выход из мастера для «только синхронизации» делает validatePage().
+    if (isHidMode())
         return OfflineTxSigningWizard::Page_ExportUnsignedTx;
-    }
 #endif
     return OfflineTxSigningWizard::Page_ImportKeyImages;
+}
+
+bool PageOTS_ExportOutputs::validatePage() {
+#ifdef FEATHER_HAVE_HID
+    // «Только синхронизация»: key images уже в кошельке, следующий экран не
+    // нужен — закрываем мастер принятием (accept), без перехода вперёд.
+    if (isHidMode() && isSyncOnlyRun() && m_hidDone && m_hidError.isEmpty()) {
+        if (auto *w = wizard())
+            w->accept();
+        return false;   // не переходим на Page_ExportUnsignedTx
+    }
+#endif
+    return true;
 }
