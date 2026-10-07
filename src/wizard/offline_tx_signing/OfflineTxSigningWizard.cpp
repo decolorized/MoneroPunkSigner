@@ -15,9 +15,7 @@
 #include "PageOTS_ImportSignedTx.h"
 
 #include <QApplication>
-#include <QLayout>
 #include <QScreen>
-#include <QPushButton>
 
 #include "utils/config.h"
 
@@ -28,51 +26,6 @@ void OfflineTxSigningWizard::reject() {
     m_wizardFields.readyToCommit = false;
     m_wizardFields.readyToSign = false;
     QWizard::reject();
-}
-
-QPushButton *OfflineTxSigningWizard::actionButton(QWizardPage *page, QLayout *parentLayout)
-{
-    if (!page || !parentLayout)
-        return nullptr;
-
-    // Кнопка переживает повторные входы на страницу, поэтому создаём один раз.
-    QPushButton *button = page->findChild<QPushButton *>(QStringLiteral("ots_action_button"));
-    if (!button) {
-        button = new QPushButton(page);
-        button->setObjectName(QStringLiteral("ots_action_button"));
-        button->setVisible(false);
-        parentLayout->addWidget(button);
-
-        // Действие подключает страница в updateActionButton(): только она
-        // знает, принять мастер (accept) или идти дальше (next).
-    }
-    return button;
-}
-
-void OfflineTxSigningWizard::setActionButtonVisible(QPushButton *button, bool visible,
-                                                    const QString &text)
-{
-    if (!button)
-        return;
-
-    if (visible)
-        button->setText(text);
-
-    button->setVisible(visible);
-    button->setEnabled(visible);
-
-    // Пока видна своя кнопка, штатные Next/Finish прячем — иначе внизу
-    // окажутся две кнопки, ведущие себя по-разному.
-    if (auto *b = this->button(QWizard::NextButton))
-        b->setVisible(!visible);
-    if (auto *b = this->button(QWizard::FinishButton))
-        b->setVisible(!visible);
-
-    // Текущая страница могла отключить кнопку в _q_updateButtonStates(),
-    // поэтому при возврате штатных кнопок пересчитываем их состояние
-    // (полезной нагрузки у сигнала нет, только пересчёт кнопок).
-    if (!visible && currentPage())
-        QMetaObject::invokeMethod(currentPage(), "completeChanged");
 }
 
 OfflineTxSigningWizard::OfflineTxSigningWizard(QWidget *parent, Wallet *wallet, PendingTransaction *tx)

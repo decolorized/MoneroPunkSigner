@@ -6,13 +6,8 @@
 
 #include <QWizard>
 #include <QFileDialog>
-#include <QPushButton>
-#include <QString>
 
 #include "Wallet.h"
-
-class QLayout;
-class QWizardPage;
 
 #ifdef FEATHER_HAVE_SCANNER
 #include "qrcode/scanner/QrCodeScanWidget.h"
@@ -75,23 +70,6 @@ public:
 
     TxWizardFields& fields() { return m_wizardFields; }
     const TxWizardFields& fields() const { return m_wizardFields; }
-
-    // Собственная кнопка действия на странице.
-    //
-    // Штатные кнопки QWizard (Next/Finish) выбираются автоматически по
-    // canContinue/canFinish и перетекстовываются в updateButtonTexts() при
-    // каждой смене страницы, поэтому подменять их надписи ненадёжно: кнопка
-    // может остаться без текста, а клик — уйти в никуда. Такие действия
-    // выносим в отдельную кнопку, состояние которой полностью наше.
-    //
-    // page — страница-владелец, parentLayout — layout, куда вставляется кнопка.
-    // Повторный вызов для той же страницы просто возвращает существующую кнопку.
-    QPushButton *actionButton(QWizardPage *page, QLayout *parentLayout);
-
-    // Показать/скрыть кнопку действия. Пока она видна, штатные Next/Finish
-    // прячутся, чтобы не было двух конфликтующих кнопок.
-    void setActionButtonVisible(QPushButton *button, bool visible,
-                                const QString &text = QString());
 
     // Отмена: сбрасываем флаги готовности, чтобы закрытие мастера
     // не привело к диалогу отправки после успешной подписи.
