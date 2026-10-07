@@ -43,6 +43,22 @@ struct TxWizardFields {
     bool isSyncOnly() const { return mode == OtsMode::SyncOnly; }
 };
 
+// QWizard решает, показывать Next/Commit или Finish, по nextId() — но
+// вызывает nextId() только при смене страницы (и в setCommitPage/
+// setFinalPage). completeChanged() пересчитывает лишь enabled, а не какая
+// кнопка видна. Страница, у которой nextId() зависит от выбранного способа
+// обмена (QR / файл / HID), после смены способа должна вызвать эту функцию,
+// иначе остаётся кнопка от прежнего способа: Next, ведущий в никуда (HID),
+// или Finish, закрывающий мастер вместо перехода к сканированию QR.
+inline void otsRefreshWizardButtons(QWizardPage *page)
+{
+    // setCommitPage() с тем же значением ничего не меняет, кроме того, что
+    // QWizard заново спрашивает nextId()/isFinalPage() и обновляет кнопки
+    // и их тексты. Для не текущей страницы это no-op.
+    if (page)
+        page->setCommitPage(page->isCommitPage());
+}
+
 class OfflineTxSigningWizard : public QWizard
 {
     Q_OBJECT

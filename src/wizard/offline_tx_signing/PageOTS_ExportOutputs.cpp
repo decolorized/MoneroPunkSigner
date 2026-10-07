@@ -94,6 +94,9 @@ void PageOTS_ExportOutputs::onMethodChanged(int index)
     }
 
     emit completeChanged();
+    // nextId() зависит от способа (HID -> -1, страница финальная): заставляем
+    // QWizard заново выбрать Next или Finish и их действие.
+    otsRefreshWizardButtons(this);
 }
 
 void PageOTS_ExportOutputs::exportOutputs() {
