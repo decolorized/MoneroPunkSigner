@@ -12,7 +12,6 @@
 #include <QMessageBox>
 #include <QPushButton>
 #include <QSignalBlocker>
-#include <QTimer>
 
 #include <memory>
 
@@ -315,11 +314,7 @@ void PageOTS_ExportOutputs::sendOutputsToHid()
     m_hidDone = false;
     m_hidError.clear();
     setHidState(true, QStringLiteral("Starting…"));
-
-    // Подпись кнопки живёт до конца жизни виджета: убираем «Finish» /
-    // «View transaction» от прошлой операции, пока новая не завершилась.
-    if (auto *w = qobject_cast<OfflineTxSigningWizard*>(wizard()))
-        w->setActionButtonText(QWizard::NextButton, QStringLiteral("Next"));
+    updateActionButton();   // спрятать кнопку действия на время операции
 
     m_op->start();
 }
@@ -370,19 +365,30 @@ void PageOTS_ExportOutputs::onHidFinished(bool ok, const QString &error)
                              "Press «View transaction» to continue."),
         true);
 
-    // Надпись ставим ПОСЛЕ setHidState(): он эмитит completeChanged, и подпись
-    // должна остаться последним изменением кнопки.
-    //
-    // Переименовываем Next, а не Finish: QWizard показывает Finish только при
-    // nextId() == -1, а тогда Next скрывается и перестаёт работать. Next виден
-    // всегда, а выход из мастера для «только синхронизации» делает
-    // validatePage().
-    if (auto *w = qobject_cast<OfflineTxSigningWizard*>(wizard())) {
-        const QString label = isSyncOnlyRun() ? QStringLiteral("Finish")
-                                              : QStringLiteral("View transaction");
-        w->setActionButtonText(QWizard::NextButton, label);
-        w->setActionButtonText(QWizard::FinishButton, label);
+    // Надпись ставим ПОСЛЕ setHidState(): он эмитит completeChanged.
+    updateActionButton();
+}
+
+// Своя кнопка действия вместо переименования штатных Next/Finish: их
+// состояние QWizard пересчитывает сам, и подменённая надпись теряется.
+void PageOTS_ExportOutputs::updateActionButton()
+{
+    auto *w = qobject_cast<OfflineTxSigningWizard*>(wizard());
+    if (!w)
+        return;
+
+    if (!m_actionButton) {
+        m_actionButton = w->actionButton(this, ui->horizontalLayout_actions);
+        if (m_actionButton) {
+            // Мастер закрываем при «только синхронизации», иначе идём дальше.
+            m_actionButton->setProperty("ots_action_accept", isSyncOnlyRun());
+        }
     }
+
+    w->setActionButtonVisible(m_actionButton,
+                              m_hidDone && m_hidError.isEmpty() && !m_hidBusy,
+                              isSyncOnlyRun() ? QStringLiteral("Finish")
+                                              : QStringLiteral("View transaction"));
 }
 
 #else  // !FEATHER_HAVE_HID
@@ -425,9 +431,9 @@ void PageOTS_ExportOutputs::initializePage() {
     if (ui->label_hid_status)
         ui->label_hid_status->clear();
 
-    // При входе на страницу возвращаем стандартную надпись кнопки.
-    if (auto *w = qobject_cast<OfflineTxSigningWizard*>(wizard()))
-        w->setActionButtonText(QWizard::NextButton, QStringLiteral("Next"));
+    // При входе на страницу прячем свою кнопку — штатные Next/Finish снова
+    // видны, а кнопка появится после успешного обмена с устройством.
+    updateActionButton();
 
     // viaHid описывает только эту страницу: сбрасываем при каждом входе.
     if (auto *w = qobject_cast<OfflineTxSigningWizard*>(wizard()))
@@ -442,6 +448,15 @@ void PageOTS_ExportOutputs::initializePage() {
         ui->combo_method->setCurrentIndex(method);
     }
     onMethodChanged(method);
+}
+
+void PageOTS_ExportOutputs::cleanupPage() {
+#ifdef FEATHER_HAVE_HID
+    // Уходя со страницы (Back), возвращаем штатные кнопки: свою кнопку
+    // действия показываем только после успешного обмена.
+    m_hidDone = false;
+    updateActionButton();
+#endif
 }
 
 int PageOTS_ExportOutputs::nextId() const {
@@ -461,19 +476,11 @@ int PageOTS_ExportOutputs::nextId() const {
 
 bool PageOTS_ExportOutputs::validatePage() {
 #ifdef FEATHER_HAVE_HID
-    // «Только синхронизация»: key images уже в кошельке, следующий экран не
-    // нужен — закрываем мастер принятием (accept), без перехода вперёд.
-    //
-    // ВАЖНО: validatePage() вызывается из QWizard::next() по сигналу clicked()
-    // кнопки, поэтому accept() откладываем на следующий цикл событий —
-    // закрытие мастера прямо в обработке нажатия приводит к падению.
-    if (isHidMode() && isSyncOnlyRun() && m_hidDone && m_hidError.isEmpty()) {
-        QTimer::singleShot(0, this, [this] {
-            if (auto *w = wizard())
-                w->accept();
-        });
-        return false;   // не переходим на Page_ExportUnsignedTx
-    }
+    // Штатная кнопка Next на этой странице не должна уводить вперёд, если
+    // мастер открыт только ради синхронизации key images. Мастер в этом
+    // случае закрывает своя кнопка действия (Finish) — см. updateActionButton().
+    if (isHidMode() && isSyncOnlyRun())
+        return false;
 #endif
     return true;
 }

@@ -9,7 +9,6 @@
 #include <QMessageBox>
 #include <QPushButton>
 #include <QSignalBlocker>
-#include <QTimer>
 
 #include <memory>
 
@@ -315,13 +314,31 @@ void PageOTS_ExportUnsignedTx::onHidFinished(bool ok, const QString &error)
                        "Press «View transaction» to review and send."),
         /*success=*/true);
 
-    // Надпись ставим ПОСЛЕ setHidState(): он эмитит completeChanged, и подпись
-    // должна остаться последним изменением кнопки. Next — рабочая кнопка
-    // (Finish на этой странице не показывается, но подстрахуемся).
-    if (auto *w = qobject_cast<OfflineTxSigningWizard*>(wizard())) {
-        w->setActionButtonText(QWizard::NextButton, QStringLiteral("View transaction"));
-        w->setActionButtonText(QWizard::FinishButton, QStringLiteral("View transaction"));
+    // Надпись ставим ПОСЛЕ setHidState(): он эмитит completeChanged.
+    updateActionButton();
+}
+
+// Своя кнопка действия: подписанная транзакция уже в fields().tx, поэтому
+// показываем её и отправляем — без экрана-заглушки и без переименования
+// штатных кнопок QWizard.
+void PageOTS_ExportUnsignedTx::updateActionButton()
+{
+    auto *w = qobject_cast<OfflineTxSigningWizard*>(wizard());
+    if (!w)
+        return;
+
+    if (!m_actionButton) {
+        m_actionButton = w->actionButton(this, ui->horizontalLayout_actions);
+        if (m_actionButton) {
+            // Действие — закрыть мастер: дальше вызывающий код покажет
+            // транзакцию и отправит её.
+            m_actionButton->setProperty("ots_action_accept", true);
+        }
     }
+
+    w->setActionButtonVisible(m_actionButton,
+                              m_signedRxViaHid && m_hidError.isEmpty() && !m_hidBusy,
+                              QStringLiteral("View transaction"));
 }
 
 #else  // !FEATHER_HAVE_HID
@@ -356,9 +373,8 @@ void PageOTS_ExportUnsignedTx::initializePage() {
     m_hidError.clear();
     m_hidBusy  = false;
     m_signedRxViaHid = false;
-    // Возвращаем стандартную надпись кнопки (её меняет onHidFinished()).
-    if (auto *w = qobject_cast<OfflineTxSigningWizard*>(wizard()))
-        w->setActionButtonText(QWizard::NextButton, QStringLiteral("Next"));
+    // Возвращаем штатные кнопки, свою прячем до успеха подписи.
+    updateActionButton();
     if (m_op) {
         m_op->disconnect(this);
         m_op->cancel();
@@ -383,6 +399,14 @@ void PageOTS_ExportUnsignedTx::initializePage() {
     onMethodChanged(method);   // для QR сам подготовит данные
 }
 
+void PageOTS_ExportUnsignedTx::cleanupPage() {
+#ifdef FEATHER_HAVE_HID
+    // Уходя со страницы (Back), возвращаем штатные кнопки.
+    m_signedRxViaHid = false;
+    updateActionButton();
+#endif
+}
+
 int PageOTS_ExportUnsignedTx::nextId() const {
     // Всегда возвращаем настоящую следующую страницу: при -1 QWizard скрывает
     // Next и игнорирует его нажатие. Для HID выход из мастера делает
@@ -393,21 +417,12 @@ int PageOTS_ExportUnsignedTx::nextId() const {
 
 bool PageOTS_ExportUnsignedTx::validatePage() {
 #ifdef FEATHER_HAVE_HID
-    // Подпись на устройстве завершена: подписанная транзакция уже в
-    // fields().tx, показываем её и отправляем — без промежуточного экрана.
-    //
-    // ВАЖНО: validatePage() вызывается из QWizard::next(), а тот — из сигнала
-    // clicked() кнопки. Закрывать мастер прямо здесь нельзя: accept() во время
-    // обработки нажатия приводит к падению. Поэтому выход откладываем на
-    // следующий цикл событий (контекст this — если страница умрёт, вызов
-    // отменится).
-    if (m_signedRxViaHid) {
-        QTimer::singleShot(0, this, [this] {
-            if (auto *w = wizard())
-                w->accept();
-        });
-        return false;   // не переходим на Page_ImportSignedTx
-    }
+    // Штатная кнопка Next не должна уводить на экран-заглушку «Signed
+    // transaction received», когда подписанная транзакция уже получена:
+    // мастер закрывает своя кнопка действия (View transaction) — см.
+    // updateActionButton(). Для QR/Files поведение прежнее.
+    if (m_signedRxViaHid)
+        return false;
 #endif
     return true;
 }

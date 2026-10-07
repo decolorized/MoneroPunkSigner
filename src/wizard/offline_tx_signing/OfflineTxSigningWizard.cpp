@@ -17,6 +17,7 @@
 #include <QApplication>
 #include <QScreen>
 #include <QPushButton>
+#include <QTimer>
 
 #include "utils/config.h"
 
@@ -29,22 +30,60 @@ void OfflineTxSigningWizard::reject() {
     QWizard::reject();
 }
 
-void OfflineTxSigningWizard::setActionButtonText(QWizard::WizardButton which, const QString &text)
+QPushButton *OfflineTxSigningWizard::actionButton(QWizardPage *page, QLayout *parentLayout)
 {
-    if (!button(which))
+    if (!page || !parentLayout)
+        return nullptr;
+
+    // Кнопка переживает повторные входы на страницу, поэтому создаём один раз.
+    QPushButton *button = page->findChild<QPushButton *>(QStringLiteral("ots_action_button"));
+    if (!button) {
+        button = new QPushButton(page);
+        button->setObjectName(QStringLiteral("ots_action_button"));
+        button->setDefault(true);
+        button->setVisible(false);
+        parentLayout->addWidget(button);
+
+        // Действие задаёт страница: она знает, закрыть мастер (accept) или
+        // идти дальше (next). Вызов отложен, чтобы не закрывать мастер внутри
+        // обработки нажатия.
+        QObject::connect(button, &QPushButton::clicked, page, [this, page] {
+            const bool accepted = page->property("ots_action_accept").toBool();
+            QTimer::singleShot(0, this, [this, accepted] {
+                if (accepted)
+                    accept();
+                else
+                    next();
+            });
+        });
+    }
+    return button;
+}
+
+void OfflineTxSigningWizard::setActionButtonVisible(QPushButton *button, bool visible,
+                                                    const QString &text)
+{
+    if (!button)
         return;
 
-    // Текст для этой кнопки на текущей странице мог быть задан через
-    // QWizardPage::setButtonText() (например «Review and send» на странице
-    // экспорта подписанной транзакции) — он имеет приоритет над нашим,
-    // поэтому снимаем его.
-    if (currentPage())
-        currentPage()->setButtonText(which, QString());
+    if (visible)
+        button->setText(text);
 
-    // Пустая строка означает «вернуть стандартную надпись»: setButtonText
-    // удаляет кастомный текст, а QWizard вернёт «&Finish»/«&Next >» сам.
-    // Прямой setText(QString()) так нельзя — надпись останется пустой.
-    setButtonText(which, text);
+    button->setVisible(visible);
+    button->setEnabled(visible);
+
+    // Пока видна своя кнопка, штатные Next/Finish прячем — иначе внизу
+    // окажутся две кнопки, ведущие себя по-разному.
+    if (auto *b = this->button(QWizard::NextButton))
+        b->setVisible(!visible);
+    if (auto *b = this->button(QWizard::FinishButton))
+        b->setVisible(!visible);
+
+    // Текущая страница могла отключить кнопку в _q_updateButtonStates(),
+    // поэтому при возврате штатных кнопок пересчитываем их состояние
+    // (полезной нагрузки у сигнала нет, только пересчёт кнопок).
+    if (!visible && currentPage())
+        QMetaObject::invokeMethod(currentPage(), "completeChanged");
 }
 
 OfflineTxSigningWizard::OfflineTxSigningWizard(QWidget *parent, Wallet *wallet, PendingTransaction *tx)

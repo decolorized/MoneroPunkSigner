@@ -13,6 +13,8 @@
 #include "MwWallet.h"
 #endif
 
+class QPushButton;
+
 namespace Ui {
     class PageOTS_Export;
 }
@@ -24,6 +26,7 @@ class PageOTS_ExportOutputs : public QWizardPage
 public:
     explicit PageOTS_ExportOutputs(QWidget *parent, Wallet *wallet);
     void initializePage() override;
+    void cleanupPage() override;
     [[nodiscard]] int nextId() const override;
     [[nodiscard]] bool isComplete() const override;
     bool validatePage() override;
@@ -49,6 +52,10 @@ private:
     bool isHidMode() const;
     // Мастер открыт только ради синхронизации key images (без PendingTransaction).
     bool isSyncOnlyRun() const;
+    // Показать/скрыть свою кнопку действия и её подпись.
+    void updateActionButton();
+
+    QPushButton *m_actionButton = nullptr;
 #endif
 
     Ui::PageOTS_Export *ui;

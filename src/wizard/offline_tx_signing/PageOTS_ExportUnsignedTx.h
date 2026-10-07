@@ -13,6 +13,8 @@
 #include "MwWallet.h"
 #endif
 
+class QPushButton;
+
 namespace Ui {
     class PageOTS_Export;
 }
@@ -24,6 +26,7 @@ class PageOTS_ExportUnsignedTx : public QWizardPage
 public:
     explicit PageOTS_ExportUnsignedTx(QWidget *parent, Wallet *wallet, PendingTransaction *tx = nullptr);
     void initializePage() override;
+    void cleanupPage() override;
     [[nodiscard]] int nextId() const override;
     [[nodiscard]] bool isComplete() const override;
     bool validatePage() override;
@@ -46,6 +49,10 @@ private:
                      const QString &note = {},
                      bool success = false);
     bool isHidMode() const;
+    // Показать/скрыть свою кнопку действия и её подпись.
+    void updateActionButton();
+
+    QPushButton *m_actionButton = nullptr;
 #endif
 
     Ui::PageOTS_Export *ui;
