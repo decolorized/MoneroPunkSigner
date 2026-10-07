@@ -20,6 +20,6 @@ src/assets/docs/*
 !src/assets/docs/.gitkeep
 contrib/installers/windows/setup.nsi
 githash.txt
-
+push.py
 # guix
 /guix
