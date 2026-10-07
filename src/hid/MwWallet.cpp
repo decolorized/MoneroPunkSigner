@@ -271,7 +271,7 @@ bool Wallet::parseInfo(const QByteArray &p, Info *info)
     info->crashFlags  = quint8(p[95]);
     info->crashStack  = readU16LE(p, 96);
 
-    if (info->proto < kProtoVersion) {
+    if (info->proto != kProtoVersion) {
         m_lastError = QStringLiteral("device speaks protocol %1; this client needs %2")
             .arg(info->proto).arg(kProtoVersion);
         return false;

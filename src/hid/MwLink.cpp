@@ -70,42 +70,44 @@ QByteArray buildMsg(quint8 cmd, quint8 arg, const QByteArray &payload)
         return {};
 
     QByteArray body;
-    body.reserve(kHdrLen + payload.size());
+    body.reserve(kHdrLen + payload.size() + kCrcLen);
 
-    // Magic
-    body.append(kMagic[0]);
-    body.append(kMagic[1]);
-
-    // cmd / arg
+    body.append(reinterpret_cast<const char*>(kMagic), kMagicLen);
+    body.append(char(kProtoVersion));
     body.append(char(cmd));
     body.append(char(arg));
-
-    // len (u32 LE)
+    body.append(char(0));                          // reserved
     appendU32LE(body, quint32(payload.size()));
+    appendU32LE(body, crc32Of(body));              // hdr_crc32 over [0, 16)
 
-    // payload
     body.append(payload);
-
-    // CRC32 по всему body (без поля CRC)
-    quint32 crc = crc32Of(body);
-
-    QByteArray out = body;
-    appendU32LE(out, crc);
-    return out;
+    appendU32LE(body, crc32Of(body));              // crc32 over everything before
+    return body;
 }
 
 // ===========================================================================
-// msgTotalLen
+// headerValid / msgTotalLen
 // ===========================================================================
+
+bool headerValid(const QByteArray &buf, int off, quint32 *plen)
+{
+    if (off < 0 || buf.size() - off < kHdrLen)
+        return false;
+    if (std::memcmp(buf.constData() + off, kMagic, kMagicLen) != 0)
+        return false;
+    if (quint8(buf[off + 8]) != kProtoVersion)
+        return false;
+    if (readU32LE(buf, off + kHdrCrcOff) != crc32Of(buf.mid(off, kHdrCrcOff)))
+        return false;
+    if (plen) *plen = readU32LE(buf, off + 12);
+    return true;
+}
 
 int msgTotalLen(const QByteArray &head)
 {
-    if (head.size() < kHdrLen)
+    quint32 plen = 0;
+    if (!headerValid(head, 0, &plen))
         return -1;
-    if (head[0] != kMagic[0] || head[1] != kMagic[1])
-        return -1;
-
-    quint32 plen = readU32LE(head, 4);
     if (plen > kMaxPayload)
         return -1;
 
@@ -127,10 +129,9 @@ bool parseMsg(const QByteArray &frame,
 {
     if (frame.size() < kHdrLen + kCrcLen)
         return false;
-    if (frame[0] != kMagic[0] || frame[1] != kMagic[1])
+    quint32 plen = 0;
+    if (!headerValid(frame, 0, &plen))
         return false;
-
-    quint32 plen = readU32LE(frame, 4);
     if (plen > kMaxPayload)
         return false;
 
@@ -145,8 +146,8 @@ bool parseMsg(const QByteArray &frame,
     if (want != got)
         return false;
 
-    if (cmd)     *cmd = quint8(frame[2]);
-    if (arg)     *arg = quint8(frame[3]);
+    if (cmd)     *cmd = quint8(frame[9]);
+    if (arg)     *arg = quint8(frame[10]);
     if (payload) *payload = frame.mid(kHdrLen, int(plen));
     return true;
 }

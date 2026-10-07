@@ -250,10 +250,9 @@ bool Hid::send(const QByteArray &msg)
     {
         QByteArray first;
         first.reserve(kHidData);
-        // Первый report: "?##" + 60 байт сообщения. Само сообщение уже начинается
-        // с magic "MW", поэтому на шине получается "?##MW...". Нельзя добавлять
-        // весь kFrameStart (5 байт): "MW" задвоится, а хвост сообщения обрежется.
-        first.append(kFrameStart, kHidFirstHdr);
+        // Первый report: "?##" + первые 60 байт сообщения (весь заголовок
+        // протокола 3 с magic и CRC заголовка помещается сюда).
+        first.append(kHidStart, kHidFirstHdr);
         first.append(msg.left(kHidFirstData));
         if (first.size() < kHidData)
             first.append(kHidData - first.size(), '\0');
@@ -307,32 +306,27 @@ RecvStatus Hid::recv(QByteArray *out, int timeoutMs)
 
         // --- Классификация report'а ---------------------------------------
         //
-        // Проблема: если буфер сборки пуст, а данных в report'е начинаются
-        // с "?##MW", их можно принять за начало нового кадра, хотя это
-        // может быть продолжение предыдущего (данные внутри полезной
-        // нагрузки тоже могут содержать такую последовательность).
-        //
-        // Правило: пока сборка кадра не завершена (m_rxExpected > 0 и
-        // m_rxBuf.size() < m_rxExpected), любой report, начинающийся с '?',
-        // считается ПРОДОЛЖЕНИЕМ — даже если внутри есть "##MW". Маркер
-        // "?##MW" распознаётся только когда буфер пуст или уже завершён.
+        // Начало кадра — "?##" и сразу за ним целый заголовок протокола 3 с
+        // верными magic, версией и CRC заголовка. Такое не появляется в
+        // данных продолжения случайно (8 байт magic + 32 бита CRC), поэтому
+        // проверяется первым и всегда: если прошлый кадр оборвался (потерян
+        // report), новый кадр начинается сразу, а не склеивается с остатком.
 
-        const bool assembling =
-            m_rxExpected > 0 && m_rxBuf.size() < m_rxExpected;
+        quint32 startPlen = 0;
+        const bool isFrameStart =
+            rep.size() >= kHidFirstHdr + kHdrLen &&
+            std::memcmp(rep.constData(), kHidStart, kHidFirstHdr) == 0 &&
+            headerValid(rep, kHidFirstHdr, &startPlen);
 
         const bool isContinuation =
-            assembling &&
-            !m_rxBuf.isEmpty() &&
+            !isFrameStart &&
+            m_rxExpected > 0 && m_rxBuf.size() < m_rxExpected &&
             rep.size() >= 1 && rep[0] == '?';
 
-        const bool isFrameStart =
-            !isContinuation &&
-            m_rxBuf.isEmpty() &&
-            rep.size() >= int(sizeof(kFrameStart)) &&
-            std::memcmp(rep.constData(), kFrameStart, sizeof(kFrameStart)) == 0;
-
         if (isFrameStart) {
-            m_rxBuf = rep.mid(3);          // "MW" + ...
+            if (m_verbose && !m_rxBuf.isEmpty())
+                qDebug() << "[MwHid] previous frame incomplete, restarting";
+            m_rxBuf = rep.mid(kHidFirstHdr);
             m_rxExpected = -1;
         } else if (isContinuation) {
             m_rxBuf.append(rep.mid(1));
@@ -344,15 +338,10 @@ RecvStatus Hid::recv(QByteArray *out, int timeoutMs)
 
         // --- Определение полной длины по заголовку ---
         if (m_rxExpected < 0 && m_rxBuf.size() >= kHdrLen) {
-            const quint32 plen = quint32(quint8(m_rxBuf[4]))
-                               | (quint32(quint8(m_rxBuf[5])) << 8)
-                               | (quint32(quint8(m_rxBuf[6])) << 16)
-                               | (quint32(quint8(m_rxBuf[7])) << 24);
-            const quint32 total = quint32(kHdrLen) + plen + quint32(kCrcLen);
-
-            if (plen > kMaxPayload || total > kMaxMsg) {
+            const int total = msgTotalLen(m_rxBuf);
+            if (total < 0) {
                 if (m_verbose)
-                    qDebug() << "[MwHid] dropping oversized frame, plen =" << plen;
+                    qDebug() << "[MwHid] dropping frame with a bad or oversized header";
                 m_rxBuf.clear();
                 m_rxExpected = -1;
                 continue;

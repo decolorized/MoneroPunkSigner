@@ -1,17 +1,23 @@
 // SPDX-License-Identifier: BSD-3-Clause
 // SPDX-FileCopyrightText: The Feather Wallet Project
 //
-// Протокол 2 (mwlink): обмен файлами Monero через HID.
-// Совместим с mwlink.py (host-side courier).
+// Протокол 3 (mwlink): обмен файлами Monero через HID.
+// Совместим с mwlink.py (host-side courier) и прошивкой ColdPunk (link.h).
 //
-// Кадр сообщения:
-//   "MW" | cmd:1 | arg:1 | len:4 (LE) | payload:len | crc32:4 (LE)
-// CRC32 считается по всему кадру до поля CRC включительно (zlib crc32).
+// Кадр сообщения (20 байт заголовка):
+//   magic:8 = 4D 57 50 4B C7 3A 5E 91 ("MWPK" + 4 случайных байта)
+//   version:1 = 3 | cmd:1 | arg:1 | reserved:1 = 0 | len:4 (LE)
+//   hdr_crc32:4 (LE) — CRC32 байтов [0, 16)
+//   payload:len | crc32:4 (LE) — CRC32 всего, что до него
 //
 // Транспорт — только HID. Формат HID report'ов:
-//   Первый report:  [report_id=0x01] [ '?' '#' '#' + первые 60 байт сообщения ] (64 байта; сообщение само начинается с "MW")
-//   Продолжение:    [report_id=0x01] [ '?' ... следующие 62 байта сообщения ]            (64 байта)
-// Приём: report'ы склеиваются, ищется маркер "?##MW", далее — продолжения с '?'.
+//   Первый report:  [report_id=0x01] [ '?' '#' '#' + первые 60 байт сообщения ]
+//   Продолжение:    [report_id=0x01] [ '?' + следующие 62 байта сообщения ]
+// Начало кадра — report "?##", за которым целый заголовок с верными magic,
+// версией и hdr_crc32 (весь заголовок помещается в первый report). Данные
+// продолжения, случайно начинающиеся с "##" или даже с magic, кадр не рвут:
+// вероятность совпадения CRC заголовка ~2^-32 поверх 64 бит magic.
+// В протоколе 2 маркером было только "?##MW" — это и было источником коллизий.
 
 #ifndef FEATHER_MWLINK_H
 #define FEATHER_MWLINK_H
@@ -44,16 +50,18 @@ constexpr int    kHidData      = 63;                // байт данных в 
 constexpr int    kHidFirstData = kHidData - 3;      // 60: первый report (после "?##")
 constexpr int    kHidContData  = kHidData - 1;      // 62: продолжения (после "?")
 
-// Маркер начала кадра: "?##" + "MW".
-constexpr char kFrameStart[5] = { '?', '#', '#', 'M', 'W' };
+// Префикс первого report'а кадра.
+constexpr char kHidStart[3] = { '?', '#', '#' };
 
 // ===========================================================================
 // Формат сообщения (COBS не нужен — HID сам разбивает на report'ы)
 // ===========================================================================
 
-constexpr quint8  kProtoVersion = 2;
-constexpr char    kMagic[2]     = { 'M', 'W' };
-constexpr int     kHdrLen       = 8;                // magic(2) + cmd(1) + arg(1) + len(4)
+constexpr quint8  kProtoVersion = 3;
+constexpr int     kMagicLen     = 8;
+constexpr unsigned char kMagic[kMagicLen] = { 0x4D, 0x57, 0x50, 0x4B, 0xC7, 0x3A, 0x5E, 0x91 };
+constexpr int     kHdrCrcOff    = 16;               // magic(8) ver cmd arg res len(4)
+constexpr int     kHdrLen       = 20;               // + hdr_crc32(4)
 constexpr int     kCrcLen       = 4;
 constexpr quint32 kMaxPayload   = 256 * 1024;       // 256 KiB, как в mwlink.py
 constexpr quint32 kMaxMsg       = kHdrLen + kMaxPayload + kCrcLen;
@@ -351,7 +359,8 @@ struct Status {
 // Сборка / разбор сообщения
 // ===========================================================================
 
-// Собрать кадр: "MW" + cmd + arg + len(LE) + payload + crc32(LE).
+// Собрать кадр: заголовок (magic, версия, cmd, arg, len, hdr_crc32) +
+// payload + crc32(LE).
 // Возвращает пустой QByteArray, если payload > kMaxPayload.
 QByteArray buildMsg(quint8 cmd, quint8 arg, const QByteArray &payload);
 
@@ -363,9 +372,14 @@ bool parseMsg(const QByteArray &frame,
               quint8 *arg,
               QByteArray *payload);
 
-// Только длина полного сообщения по первым 8 байтам.
-// Возвращает -1, если заголовок ещё не полный или некорректен.
+// Только длина полного сообщения по первым kHdrLen байтам.
+// Возвращает -1, если заголовок ещё не полный или некорректен (magic,
+// версия, CRC заголовка, длина).
 int msgTotalLen(const QByteArray &head);
+
+// Заголовок протокола 3 в buf[off .. off + kHdrLen): magic, версия и CRC
+// заголовка сходятся. При успехе отдаёт длину payload (ещё не проверенную).
+bool headerValid(const QByteArray &buf, int off, quint32 *plen);
 
 // ===========================================================================
 // Определение типа файла по magic (для CMD_PUT с KindAuto)
