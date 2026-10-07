@@ -27,7 +27,6 @@ public:
     void cleanupPage() override;
     [[nodiscard]] int nextId() const override;
     [[nodiscard]] bool isComplete() const override;
-    bool validatePage() override;
 
 private slots:
     void exportOutputs();

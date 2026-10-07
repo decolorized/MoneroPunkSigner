@@ -351,12 +351,10 @@ void PageOTS_ExportOutputs::onHidFinished(bool ok, const QString &error)
     m_hidDone = true;
     m_hidError.clear();
 
-    // HID-синхронизация завершена. Делаем страницу финальной (QWizard
-    // покажет Finish вместо Next) и переименовываем кнопку.
-    setFinalPage(isSyncOnlyRun());
-    setButtonText(QWizard::FinishButton,
-                  isSyncOnlyRun() ? QStringLiteral("Finish")
-                                  : QStringLiteral("View transaction"));
+    // HID-синхронизация завершена. Страница уже «финальная» за счёт
+    // nextId() == -1 (см. nextId()): QWizard показывает Finish, а Finish
+    // доступен ровно тогда, когда isComplete() == true.
+    setButtonText(QWizard::FinishButton, QStringLiteral("Finish"));
 
     setHidState(false,
         isSyncOnlyRun()
@@ -407,9 +405,8 @@ void PageOTS_ExportOutputs::initializePage() {
     if (ui->label_hid_status)
         ui->label_hid_status->clear();
 
-    // При входе на страницу сбрасываем финальность и текст кнопки:
-    // QWizard сам покажет Next/Finish в зависимости от nextId().
-    setFinalPage(false);
+    // Текст кнопки Finish на входе. Финальность НЕ трогаем: её определяет
+    // nextId() (-1 в HID-режиме), setFinalPage() не используем.
     setButtonText(QWizard::FinishButton, "Finish");
 
     // viaHid описывает только эту страницу: сбрасываем при каждом входе.
@@ -431,28 +428,19 @@ void PageOTS_ExportOutputs::cleanupPage() {
 #ifdef FEATHER_HAVE_HID
     // Уходя со страницы (Back), возвращаем штатные кнопки.
     m_hidDone = false;
-    setFinalPage(false);
     setButtonText(QWizard::FinishButton, "Finish");
 #endif
 }
 
 int PageOTS_ExportOutputs::nextId() const {
 #ifdef FEATHER_HAVE_HID
-    // HID-ветка: экран «2. Key images received» больше не показываем — key
-    // images уже импортированы в кошелёк на этом шаге.
+    // HID-режим: key images уже импортированы в кошелёк прямо на этой
+    // странице, страница Import не нужна. -1 делает страницу финальной:
+    // QWizard скрывает Next и показывает Finish (доступен, когда isComplete()).
+    // Нельзя «блокировать» Next через validatePage() == false — это же
+    // validatePage() вызывается и на Finish, и мастер перестаёт закрываться.
     if (isHidMode())
-        return OfflineTxSigningWizard::Page_ExportUnsignedTx;
+        return -1;
 #endif
     return OfflineTxSigningWizard::Page_ImportKeyImages;
-}
-
-bool PageOTS_ExportOutputs::validatePage() {
-#ifdef FEATHER_HAVE_HID
-    // Штатная кнопка Next на этой странице не должна уводить вперёд, если
-    // мастер открыт только ради синхронизации key images: закрывает
-    // страница через setFinalPage(true) + setButtonText(FinishButton).
-    if (isHidMode() && isSyncOnlyRun())
-        return false;
-#endif
-    return true;
 }

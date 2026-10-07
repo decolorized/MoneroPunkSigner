@@ -230,6 +230,8 @@ void PageOTS_ExportUnsignedTx::signOnHid()
             PendingTransaction *tx = raw.empty() ? nullptr
                                                  : m_wallet->loadSignedTxFromStr(raw);
             if (!tx || tx->status() != PendingTransaction::Status_Ok) {
+                if (tx)
+                    m_wallet->disposeTransaction(tx);
                 ok = false;
                 error = raw.empty()
                     ? QStringLiteral("Device returned an empty signed transaction")
@@ -242,6 +244,7 @@ void PageOTS_ExportUnsignedTx::signOnHid()
             else if (!m_tx
                      || tx->amount() != m_tx->amount()
                      || tx->fee()    != m_tx->fee()) {
+                m_wallet->disposeTransaction(tx);
                 ok = false;
                 error = QStringLiteral(
                     "The signed transaction returned by the device does not match "
@@ -307,12 +310,9 @@ void PageOTS_ExportUnsignedTx::onHidFinished(bool ok, const QString &error)
 
     m_hidDone = true;
     m_hidError.clear();
-    m_signedRxViaHid = true;
 
-    // Подпись получена: страница финальная, показываем Finish с надписью
-    // «View transaction» (клик закрывает мастер, вызывающий код покажет
-    // транзакцию и отправит).
-    setFinalPage(true);
+    // Подпись получена. Страница финальная за счёт nextId() == -1 (HID-режим),
+    // Finish закрывает мастер, вызывающий код покажет транзакцию и отправит.
     setButtonText(QWizard::FinishButton, "View transaction");
 
     setHidState(false,
@@ -352,7 +352,6 @@ void PageOTS_ExportUnsignedTx::initializePage() {
     m_hidDone  = false;
     m_hidError.clear();
     m_hidBusy  = false;
-    m_signedRxViaHid = false;
     if (m_op) {
         m_op->disconnect(this);
         m_op->cancel();
@@ -362,8 +361,7 @@ void PageOTS_ExportUnsignedTx::initializePage() {
     if (ui->label_hid_status)
         ui->label_hid_status->clear();
 
-    // Сбрасываем финальность и текст кнопки на входе.
-    setFinalPage(false);
+    // Текст кнопки Finish на входе; финальность определяет nextId().
     setButtonText(QWizard::FinishButton, "Finish");
 
     // Новый этап подписи: viaHid от предыдущего этапа (key images) не должен
@@ -383,29 +381,23 @@ void PageOTS_ExportUnsignedTx::initializePage() {
 
 void PageOTS_ExportUnsignedTx::cleanupPage() {
 #ifdef FEATHER_HAVE_HID
-    // Уходя со страницы (Back), возвращаем штатные кнопки.
-    m_signedRxViaHid = false;
-    setFinalPage(false);
+    // Уходя со страницы (Back), возвращаем штатный текст кнопки.
     setButtonText(QWizard::FinishButton, "Finish");
 #endif
 }
 
 int PageOTS_ExportUnsignedTx::nextId() const {
-    // Всегда возвращаем настоящую следующую страницу: при -1 QWizard скрывает
-    // Next и игнорирует его нажатие. Для HID выход из мастера делает
-    // validatePage(), поэтому экран-заглушка «Signed transaction received»
-    // пропускается без потери кнопки.
+#ifdef FEATHER_HAVE_HID
+    // HID-режим: подписанная транзакция принимается на этой же странице,
+    // страница Import не нужна. -1 → страница финальная (Next скрыт, Finish
+    // доступен по isComplete()). validatePage() здесь НЕ блокирует переход:
+    // при false не закрывался бы и Finish.
+    if (isHidMode())
+        return -1;
+#endif
     return OfflineTxSigningWizard::Page_ImportSignedTx;
 }
 
 bool PageOTS_ExportUnsignedTx::validatePage() {
-#ifdef FEATHER_HAVE_HID
-    // Штатная кнопка Next не должна уводить на экран-заглушку «Signed
-    // transaction received», когда подписанная транзакция уже получена:
-    // мастер закрывает setFinalPage(true) + Finish (см. onHidFinished()).
-    // Для QR/Files поведение прежнее.
-    if (m_signedRxViaHid)
-        return false;
-#endif
     return true;
 }
