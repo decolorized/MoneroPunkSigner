@@ -15,6 +15,7 @@
 #include "PageOTS_ImportSignedTx.h"
 
 #include <QApplication>
+#include <QLayout>
 #include <QScreen>
 #include <QPushButton>
 #include <QTimer>
