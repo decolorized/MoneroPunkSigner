@@ -13,6 +13,14 @@
 #include "qrcode/scanner/QrCodeScanWidget.h"
 #endif
 
+// Зачем открыт мастер. От этого зависит, что делать после синхронизации
+// key images по HID: закрыть мастер (SyncOnly) или продолжить подпись
+// транзакции (SignAndSend).
+enum class OtsMode {
+    SyncOnly,      // мастер открыт без PendingTransaction: только синхронизация
+    SignAndSend,   // мастер открыт из onTransactionCreated: синхронизация + отправка
+};
+
 struct TxWizardFields {
     UnsignedTransaction *utx = nullptr;
     PendingTransaction  *tx = nullptr;
@@ -24,10 +32,15 @@ struct TxWizardFields {
     bool                 readyToSign = false;
     std::string          keyImages;
 
+    // Режим мастера, выставляется в конструкторе (tx == nullptr → SyncOnly).
+    OtsMode              mode = OtsMode::SyncOnly;
+
     bool    viaHid        = false;
     qint64  keyImagesSize = 0;
     qint64  signedTxSize  = 0;
     QString hidDeviceName;
+
+    bool isSyncOnly() const { return mode == OtsMode::SyncOnly; }
 };
 
 class OfflineTxSigningWizard : public QWizard

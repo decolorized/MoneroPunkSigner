@@ -164,8 +164,16 @@ if (FEATHER_HAVE_OTS_WIZARD)
             "qrcode/scanner/URWidget.cpp")
 endif()
 
-# Приём QR камерой: QrCodeScanWidget/QrScanThread (Qt Multimedia) и
-# qrcode/utils (ZXing). Только со сканером.
+# Приём QR камерой: QrCodeScanWidget/QrScanThread (Qt Multimedia), диалоги
+# сканера и qrcode/utils (ZXing). Только со сканером.
+#
+# ВАЖНО: список должен покрывать ВСЕ файлы камерного сканера. Диалоги
+# (QrCodeScanDialog, URDialog) вызываются не только из визарда, но и из
+# MainWindow / SendWidget / PageWalletRestoreKeys под WITH_SCANNER: если их
+# не собрать, линковка падает на undefined reference.
+#
+# URWidget в этот список не входит: он относится к генерации QR, собирается
+# всегда (см. UR_WIDGET_FILES выше) и нужен визарду и без камеры.
 if (WITH_SCANNER)
     file(GLOB QRCODE_UTILS_FILES
             "qrcode/utils/*.h"
@@ -176,7 +184,11 @@ if (WITH_SCANNER)
             "qrcode/scanner/QrCodeScanWidget.cpp"
             "qrcode/scanner/QrCodeScanWidget.ui"
             "qrcode/scanner/QrScanThread.h"
-            "qrcode/scanner/QrScanThread.cpp")
+            "qrcode/scanner/QrScanThread.cpp"
+            "qrcode/scanner/QrCodeScanDialog.h"
+            "qrcode/scanner/QrCodeScanDialog.cpp"
+            "qrcode/scanner/URDialog.h"
+            "qrcode/scanner/URDialog.cpp")
 endif()
 
 list(APPEND SOURCE_FILES

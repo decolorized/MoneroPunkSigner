@@ -46,6 +46,8 @@ private:
                      const QString &note = {},
                      bool success = false);
     bool isHidMode() const;
+    // Мастер открыт только ради синхронизации key images (без PendingTransaction).
+    bool isSyncOnlyRun() const;
 #endif
 
     Ui::PageOTS_Export *ui;

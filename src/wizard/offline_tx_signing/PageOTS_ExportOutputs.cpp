@@ -156,7 +156,9 @@ bool PageOTS_ExportOutputs::isHidMode() const
 
 bool PageOTS_ExportOutputs::isComplete() const
 {
-    if (isHidMode())
+    // Сравниваем индекс напрямую: isHidMode() существует только при
+    // FEATHER_HAVE_HID, а этот метод компилируется всегда.
+    if (ui->combo_method->currentIndex() == kMethodHid)
         return m_hidDone && m_hidError.isEmpty() && !m_hidBusy;
     return true;
 }
@@ -177,6 +179,11 @@ void PageOTS_ExportOutputs::setHidState(bool busy,
         ui->label_hid_status->setText(note);
     }
 
+    // В режиме «только синхронизация» nextId() возвращает -1, поэтому QWizard
+    // сам показывает вместо Next кнопку Finish (canFinish в
+    // QWizardPrivate::_q_updateButtonStates). Текст не подменяем, чтобы не
+    // потерять стандартную мнемонику из updateButtonTexts().
+
     // Сначала пересчёт QWizard, потом Back — иначе QWizard перезапишет состояние.
     emit completeChanged();
     if (auto *w = wizard()) {
@@ -185,6 +192,14 @@ void PageOTS_ExportOutputs::setHidState(bool busy,
         // Cancel оставляем доступным: закрытие мастера безопасно —
         // ~HidOperation отменяет операцию и дожидается потока.
     }
+}
+
+// Мастер открыт только ради синхронизации key images (без PendingTransaction):
+// после успешного обмена следующий экран не нужен.
+bool PageOTS_ExportOutputs::isSyncOnlyRun() const
+{
+    auto *w = qobject_cast<OfflineTxSigningWizard*>(wizard());
+    return w && w->fields().isSyncOnly();
 }
 
 void PageOTS_ExportOutputs::sendOutputsToHid()
@@ -300,6 +315,14 @@ void PageOTS_ExportOutputs::sendOutputsToHid()
     m_hidError.clear();
     setHidState(true, QStringLiteral("Starting…"));
 
+    // setText кнопки живёт до конца жизни виджета: сбрасываем подпись
+    // «View transaction» от прошлой операции, иначе она всплывёт в сессии
+    // «только синхронизация», где нужна обычная Finish.
+    if (auto *w = wizard()) {
+        if (auto *finish = w->button(QWizard::FinishButton))
+            finish->setText(QString());
+    }
+
     m_op->start();
 }
 
@@ -340,9 +363,28 @@ void PageOTS_ExportOutputs::onHidFinished(bool ok, const QString &error)
 
     m_hidDone = true;
     m_hidError.clear();
+
+    // Сценарий «синхронизация + отправка»: обмен с устройством закончен, и
+    // дальше остаётся только показать полученную транзакцию и отправить её.
+    // Кнопку (QWizard показывает на этой странице Finish) называем
+    // «View transaction» — как и на экране подписи.
+    if (!isSyncOnlyRun()) {
+        if (auto *w = wizard()) {
+            if (auto *finish = w->button(QWizard::FinishButton))
+                finish->setText(QStringLiteral("View transaction"));
+        }
+    } else if (auto *w = wizard()) {
+        // Обратный случай: в этой сессии нужна обычная Finish.
+        if (auto *finish = w->button(QWizard::FinishButton))
+            finish->setText(QString());
+    }
+
     setHidState(false,
-        QStringLiteral("✅ Key images imported successfully.\n"
-                       "Press Next to continue."),
+        isSyncOnlyRun()
+            ? QStringLiteral("✅ Key images synchronized and imported.\n"
+                             "Press Finish to close the wizard.")
+            : QStringLiteral("✅ Key images imported successfully.\n"
+                             "Press «View transaction» to continue."),
         true);
 }
 
@@ -402,5 +444,18 @@ void PageOTS_ExportOutputs::initializePage() {
 }
 
 int PageOTS_ExportOutputs::nextId() const {
+#ifdef FEATHER_HAVE_HID
+    // HID-ветка: экран «2. Key images received» больше не показываем — key
+    // images уже импортированы в кошелёк на этом шаге.
+    //
+    //   • только синхронизация (мастер без PendingTransaction) → -1:
+    //     QWizard завершает мастер по Finish, экран unsigned tx не нужен;
+    //   • синхронизация + отправка → сразу «3. Export unsigned transaction».
+    if (isHidMode()) {
+        if (isSyncOnlyRun())
+            return -1;
+        return OfflineTxSigningWizard::Page_ExportUnsignedTx;
+    }
+#endif
     return OfflineTxSigningWizard::Page_ImportKeyImages;
 }

@@ -33,6 +33,11 @@ OfflineTxSigningWizard::OfflineTxSigningWizard(QWidget *parent, Wallet *wallet, 
     : QWizard(parent)
     , m_wallet(wallet)
 {
+    // Режим определяется точкой входа: onTransactionCreated() передаёт
+    // PendingTransaction (синхронизация + отправка), showKeyImageSyncWizard()
+    // и офлайн-кошелёк — нет (только синхронизация).
+    m_wizardFields.mode = (tx == nullptr) ? OtsMode::SyncOnly : OtsMode::SignAndSend;
+
 #ifdef FEATHER_HAVE_SCANNER
     m_wizardFields.scanWidget = new QrCodeScanWidget(nullptr);
 #endif

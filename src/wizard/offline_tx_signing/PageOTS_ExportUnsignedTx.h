@@ -55,6 +55,9 @@ private:
     MwLink::HidOperation *m_op = nullptr;
     bool                  m_hidBusy = false;
     bool                  m_hidDone = false;
+    // Подписанная транзакция принята от устройства: следующий экран
+    // («Signed transaction received») не нужен, Finish завершает мастер.
+    bool                  m_signedRxViaHid = false;
     QString               m_hidError;
 #endif
 };
