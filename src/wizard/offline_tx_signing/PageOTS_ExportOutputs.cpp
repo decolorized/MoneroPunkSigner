@@ -380,8 +380,18 @@ void PageOTS_ExportOutputs::updateActionButton()
     if (!m_actionButton) {
         m_actionButton = w->actionButton(this, ui->horizontalLayout_actions);
         if (m_actionButton) {
-            // Мастер закрываем при «только синхронизации», иначе идём дальше.
-            m_actionButton->setProperty("ots_action_accept", isSyncOnlyRun());
+            // Клик обрабатываем напрямую: страница знает, закрыть мастер
+            // (только синхронизация) или идти к подписи (синхронизация +
+            // отправка). Кнопка создаётся один раз — и соединение одно.
+            connect(m_actionButton, &QPushButton::clicked, this, [this] {
+                auto *wz = qobject_cast<OfflineTxSigningWizard*>(wizard());
+                if (!wz)
+                    return;
+                if (isSyncOnlyRun())
+                    wz->accept();
+                else
+                    wz->next();
+            });
         }
     }
 

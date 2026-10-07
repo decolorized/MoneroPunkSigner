@@ -18,7 +18,6 @@
 #include <QLayout>
 #include <QScreen>
 #include <QPushButton>
-#include <QTimer>
 
 #include "utils/config.h"
 
@@ -41,22 +40,11 @@ QPushButton *OfflineTxSigningWizard::actionButton(QWizardPage *page, QLayout *pa
     if (!button) {
         button = new QPushButton(page);
         button->setObjectName(QStringLiteral("ots_action_button"));
-        button->setDefault(true);
         button->setVisible(false);
         parentLayout->addWidget(button);
 
-        // Действие задаёт страница: она знает, закрыть мастер (accept) или
-        // идти дальше (next). Вызов отложен, чтобы не закрывать мастер внутри
-        // обработки нажатия.
-        QObject::connect(button, &QPushButton::clicked, page, [this, page] {
-            const bool accepted = page->property("ots_action_accept").toBool();
-            QTimer::singleShot(0, this, [this, accepted] {
-                if (accepted)
-                    accept();
-                else
-                    next();
-            });
-        });
+        // Действие подключает страница в updateActionButton(): только она
+        // знает, принять мастер (accept) или идти дальше (next).
     }
     return button;
 }

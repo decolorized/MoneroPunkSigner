@@ -330,9 +330,13 @@ void PageOTS_ExportUnsignedTx::updateActionButton()
     if (!m_actionButton) {
         m_actionButton = w->actionButton(this, ui->horizontalLayout_actions);
         if (m_actionButton) {
-            // Действие — закрыть мастер: дальше вызывающий код покажет
-            // транзакцию и отправит её.
-            m_actionButton->setProperty("ots_action_accept", true);
+            // Подписанная транзакция уже в fields().tx: клик закрывает мастер,
+            // дальше вызывающий код показывает транзакцию и отправляет её.
+            connect(m_actionButton, &QPushButton::clicked, this, [this] {
+                auto *wz = qobject_cast<OfflineTxSigningWizard*>(wizard());
+                if (wz)
+                    wz->accept();
+            });
         }
     }
 
