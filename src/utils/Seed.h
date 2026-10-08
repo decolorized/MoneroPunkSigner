@@ -32,11 +32,17 @@ struct Seed {
 
     QString errorString;
 
+    // Polyseed with the "encrypted" flag (Cake Wallet / Cupcake: the passphrase
+    // encrypts the phrase itself). spendKey is only valid once decrypted.
     bool encrypted = false;
+    bool decrypted = false;
 
     explicit Seed();
     explicit Seed(Type type, NetworkType::Type networkType = NetworkType::MAINNET, QString language = "English", const char* secret = nullptr);
-    explicit Seed(Type type, QStringList mnemonic, NetworkType::Type networkType = NetworkType::MAINNET);
+    // `passphrase` is used only for an encrypted polyseed: it unmasks the
+    // phrase (polyseed_crypt) before keygen. It is NOT a seed offset.
+    explicit Seed(Type type, QStringList mnemonic, NetworkType::Type networkType = NetworkType::MAINNET,
+                  const QString &passphrase = QString());
     void setRestoreHeight(int height);
 
 private:

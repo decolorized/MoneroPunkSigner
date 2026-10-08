@@ -7,6 +7,8 @@
 
 #include <QCheckBox>
 #include <QDialogButtonBox>
+#include <QInputDialog>
+#include <QLineEdit>
 #include <QPushButton>
 #include <QShortcut>
 
@@ -190,9 +192,32 @@ bool PageWalletRestoreSeed::validatePage() {
 
     Seed _seed = Seed(m_fields->seedType, seedSplit, constants::networkType);
 
-    if (_seed.encrypted) {
-        Utils::showError(this, "Encrypted seed", "This seed is encrypted. Encrypted seeds are not supported");
-        return false;
+    // Two passphrase formats, told apart by the phrase itself:
+    //   plain polyseed (Feather)   - optional passphrase = seed offset
+    //                                ("Extend this seed with a passphrase")
+    //   encrypted polyseed (Cake Wallet / Cupcake) - the passphrase decrypts
+    //                                the phrase; it must not become an offset
+    if (_seed.encrypted && _seed.errorString.isEmpty()) {
+        bool ok = false;
+        QString pass = QInputDialog::getText(this, "Encrypted seed",
+            "This seed is encrypted with a passphrase (Cake Wallet / Cupcake format).\n"
+            "Enter the passphrase:", QLineEdit::Password, QString(), &ok);
+        if (!ok) {
+            return false;
+        }
+        if (pass.isEmpty()) {
+            Utils::showError(this, "Encrypted seed", "This seed cannot be restored without its passphrase.");
+            return false;
+        }
+        _seed = Seed(m_fields->seedType, seedSplit, constants::networkType, pass);
+        pass.fill(QChar(0));
+        if (_seed.errorString.isEmpty() && !_seed.decrypted) {
+            Utils::showError(this, "Encrypted seed", "Unable to decrypt the seed.");
+            return false;
+        }
+        // The passphrase is spent on decrypting the phrase: no seed offset.
+        m_fields->seedOffsetPassphrase.clear();
+        m_fields->showSetSeedPassphrasePage = false;
     }
 
     if (!_seed.errorString.isEmpty()) {

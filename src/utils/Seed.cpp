@@ -10,6 +10,7 @@
 #include "crypto/crypto.h"
 #include "mnemonics/electrum-words.h"
 
+#include <cstring>
 #include <sstream>
 #include <utility>
 #include <iomanip>
@@ -70,7 +71,7 @@ Seed::Seed(Type type, NetworkType::Type networkType, QString language, const cha
     this->setRestoreHeight();
 }
 
-Seed::Seed(Type type, QStringList mnemonic, NetworkType::Type networkType)
+Seed::Seed(Type type, QStringList mnemonic, NetworkType::Type networkType, const QString &passphrase)
     : type(type), mnemonic(std::move(mnemonic)), networkType(networkType)
 {
     if (m_seedLength[this->type] != this->mnemonic.length()) {
@@ -88,6 +89,23 @@ Seed::Seed(Type type, QStringList mnemonic, NetworkType::Type networkType)
             polyseed::data seed(POLYSEED_MONERO);
             auto lang = seed.decode(this->mnemonic.join(" ").toStdString().c_str());
 
+            this->time = seed.birthday();
+            this->setRestoreHeight();
+
+            // Cake Wallet / Cupcake: the phrase is encrypted with the passphrase
+            // (polyseed feature flag). Unmask it first; the result is restored
+            // like any plain polyseed, without a seed offset.
+            this->encrypted = seed.encrypted();
+            if (this->encrypted) {
+                if (passphrase.isEmpty()) {
+                    return;                         // caller asks for the passphrase
+                }
+                QByteArray pw = passphrase.toUtf8();
+                seed.crypt(pw.constData());
+                pw.fill('\0');
+                this->decrypted = true;
+            }
+
             uint8_t key[32];
             seed.keygen(&key, sizeof(key));
 
@@ -96,11 +114,7 @@ Seed::Seed(Type type, QStringList mnemonic, NetworkType::Type networkType)
                 keyStream << std::hex << std::setfill('0') << std::setw(2) << (int)i;
             }
             this->spendKey = QString::fromStdString(keyStream.str());
-
-            this->time = seed.birthday();
-            this->setRestoreHeight();
-
-            this->encrypted = seed.encrypted();
+            memset(key, 0, sizeof(key));
         }
         catch (const std::exception &e) {
             this->errorString = e.what();
