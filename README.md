@@ -1,10 +1,9 @@
 # MoneroPunkSigner
 
 **MoneroPunkSigner** is a fork of [Feather Wallet](https://github.com/feather-wallet/feather)
-that works natively with **[ColdPunk](#coldpunk)**, an air-gapped Monero cold
+that works natively with **[ColdPunk](https://github.com/decolorized/ColdPunk)**, an air-gapped Monero cold
 wallet on ESP32-S3 boards. Outputs, key images, unsigned and signed
-transactions, and view-only wallet data travel over **USB HID** instead of QR
-codes or files.
+transactions, and view-only wallet data travel over **USB HID**.
 
 > [!WARNING]
 > **Experimental. Not audited.** MoneroPunkSigner and ColdPunk have not been
@@ -27,6 +26,7 @@ MoneroPunkSigner does too; this document covers what the fork adds.
 - [Device access (Linux udev)](#device-access-linux-udev)
 - [Troubleshooting](#troubleshooting)
 - [Source layout](#source-layout)
+- [Related projects](#related-projects)
 - [Upstream Feather resources](#upstream-feather-resources)
 - [Disclaimer and license](#disclaimer-and-license)
 
@@ -37,10 +37,10 @@ MoneroPunkSigner does too; this document covers what the fork adds.
 | Area | Change |
 | :--- | :--- |
 | **HID transport** (`src/hid/`) | mwlink protocol 3 client over USB HID: framing with an 8-byte magic and header CRC, payload CRC32, 256 KiB limit, cancellation, device log forwarding. |
-| **Offline signing wizard** (`src/wizard/offline_tx_signing/`) | A third method, **HID device**, next to *Animated QR codes* and *Files*. Key images and signed transactions come back on the same page, with no import step. The Next/Finish button follows the selected method. |
+| **Offline signing wizard** (`src/wizard/offline_tx_signing/`) | A new method, **HID device**. Key images and signed transactions come back on the same page, with no import step. The Next/Finish button follows the selected method. |
 | **Key image sync** | *Send via HID*: outputs go to the device, the user confirms there, and the returned key images are imported into the wallet. |
 | **Signing** | *Sign on HID*: the unsigned transaction goes to the device, which shows the amount, fee and full addresses. The returned transaction must match the unsigned one (amount and fee) before it is offered for broadcast. |
-| **Restore from keys** | A **ColdPunk** button next to *Scan QR*. It asks the device for the primary address, private view key, restore height and wallet name (Yes/No on the device) and fills the form. |
+| **Restore from keys** | A **ColdPunk** button in the button row of the page. It asks the device for the primary address, private view key, restore height and wallet name (Yes/No on the device) and fills the form. |
 | **Encrypted polyseed** | 16-word seeds encrypted with a passphrase (Cake Wallet / Cupcake, polyseed "encrypted" flag) can be restored. The passphrase is asked for and the seed is decrypted. |
 | **Safety around the device** | The device outbox is cleared before and after every exchange, so a stale result is never taken. Long operations run in a background thread and can be cancelled. Firmware with another protocol version is refused with a clear message. |
 | **Optional build** | HID support is compiled in when `hidapi` is found. Without it the build is plain Feather and the HID options are hidden or disabled. |
@@ -56,8 +56,9 @@ private spend key never leave the device. The private view key leaves only on a
 PC request that you confirm on the device.
 
 The firmware, supported boards, build instructions and the protocol
-specification live in the ColdPunk repository (`README.md`,
-`tools/docs/usb_link_protocol.md`).
+specification live in the **[ColdPunk repository](https://github.com/decolorized/ColdPunk)**: see its
+[README](https://github.com/decolorized/ColdPunk#readme) and
+[`tools/docs/usb_link_protocol.md`](https://github.com/decolorized/ColdPunk/blob/HEAD/tools/docs/usb_link_protocol.md).
 
 USB identification: VID `0x303A`, PIDs `0x4024`, `0x4025`, `0x1001`, HID usage
 page `0xFF00`. MoneroPunkSigner and the firmware must use the same protocol
@@ -94,7 +95,7 @@ these. Every result needs a *Yes* on the device.
    then sign there.
 4. **View transaction** shows the signed transaction for review and broadcast.
 
-QR codes and files still work: switch the method on any step.
+Files still work: switch the method on any step.
 
 ---
 
@@ -183,7 +184,7 @@ symlink. Re-plug the device afterwards.
 | `The device is busy…` | Finish or cancel the pending screen on the device. |
 | `Declined on the device` | *No* was pressed on the device. |
 | Protocol version mismatch | Update the firmware and MoneroPunkSigner together. |
-| `Outputs too large for HID` | More than 256 KiB: use files or QR, or export only new outputs. |
+| `Outputs too large for HID` | More than 256 KiB: use files, or export only new outputs. |
 | `amount or fee mismatch` | The device returned a signed transaction that does not belong to this one (stale outbox). Nothing is broadcast; retry. |
 | `key image not synchronised` (device log) | Run key image sync with *Export all outputs*, then create the transaction again. |
 | Restored address differs from Cupcake | Check the passphrase. A wrong passphrase derives another wallet. |
@@ -205,6 +206,18 @@ src/wizard/PageWalletRestoreSeed encrypted polyseed restore
 src/utils/Seed                   polyseed decryption before keygen
 install-udev-rule.sh             Linux device access
 ```
+
+---
+
+## Related projects
+
+| Project | Role |
+| :--- | :--- |
+| **[MoneroPunkSigner](https://github.com/decolorized/MoneroPunkSigner)** (this repository) | Feather Wallet fork for the PC: watch-only wallet with native ColdPunk support |
+| **[ColdPunk](https://github.com/decolorized/ColdPunk)** | firmware of the offline signing device (ESP32-S3) |
+
+Use matching versions: both sides must speak the same mwlink protocol version
+(currently 3).
 
 ---
 
