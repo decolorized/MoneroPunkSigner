@@ -78,6 +78,13 @@ public:
     bool clear(Kind kind = KindAll);
     bool request(Req what);
 
+    // Ждёт ответ на request(): устройство показывает вопрос «да/нет», после
+    // «да» кладёт JSON (KExport) в outbox — забираем его GET'ом. Отказ на
+    // устройстве (запрос забран, outbox пуст, кошелёк снова свободен два
+    // опроса подряд), блокировка, закрытие кошелька, таймаут и отмена —
+    // false с понятным lastError().
+    bool waitForRequest(QByteArray *out, int timeoutMs = 600000, int pollMs = 500);
+
     // put + waitForResult (kindIn может быть KindAuto).
     bool exchangeFile(Kind kindIn, const QByteArray &data,
                       Kind kindOut, QByteArray *out,

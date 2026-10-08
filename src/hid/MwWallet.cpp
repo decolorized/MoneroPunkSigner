@@ -485,6 +485,63 @@ bool Wallet::waitForResult(Kind resultKind, Kind inputKind, QByteArray *out,
     return false;
 }
 
+bool Wallet::waitForRequest(QByteArray *out, int timeoutMs, int pollMs)
+{
+    m_lastError.clear();
+    m_deviceError.clear();
+    if (!out) {
+        m_lastError = QStringLiteral("waitForRequest: null output");
+        return false;
+    }
+
+    QElapsedTimer clock;
+    clock.start();
+    int idlePolls = 0;
+
+    while (clock.elapsed() < timeoutMs) {
+        Status st;
+        if (!status(&st))
+            return false;   // lastError: Cancelled / timeout / ошибка транспорта
+
+        if (st.hasOutbox(KExport))
+            return get(KExport, out, 60000);
+
+        if (st.state == StateLocked || st.state == StateMenu) {
+            m_lastError = QStringLiteral(
+                "The device was locked or the wallet was closed before the answer was ready");
+            return false;
+        }
+
+        // Запрос забран устройством (request == 0), оно снова свободно,
+        // а результата нет — пользователь ответил «нет».
+        if (st.request == 0 && st.state == StateWallet) {
+            if (++idlePolls >= 2) {
+                m_lastError = m_deviceError.isEmpty()
+                    ? QStringLiteral("Declined on the device")
+                    : QStringLiteral("Declined on the device: %1").arg(m_deviceError);
+                return false;
+            }
+        } else {
+            idlePolls = 0;
+        }
+
+        switch (pumpEvents(pollMs)) {
+        case RecvStatus::Cancelled:
+            m_lastError = QStringLiteral("Cancelled");
+            return false;
+        case RecvStatus::Error:
+            if (m_lastError.isEmpty())
+                m_lastError = m_hid.lastError();
+            return false;
+        default:
+            break;
+        }
+    }
+
+    m_lastError = QStringLiteral("Timed out waiting for confirmation on the device");
+    return false;
+}
+
 bool Wallet::clear(Kind kind)
 {
     m_lastError.clear();
